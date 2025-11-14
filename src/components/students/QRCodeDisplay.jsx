@@ -1,0 +1,241 @@
+import { useState, useRef } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
+import { X, Download, Printer, RotateCcw, Ban } from 'lucide-react'
+import { Button } from '../ui'
+import { useStudents } from '../../hooks/useStudents'
+import toast from 'react-hot-toast'
+import { STATUTS_QR_CODE } from '../../lib/constants'
+
+export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
+  const { revokeQRCode } = useStudents()
+  const [loading, setLoading] = useState(false)
+  const qrRef = useRef(null)
+
+  // Générer le token JSON sécurisé
+  const generateQRData = () => {
+    if (!student.qr_code_token) return null
+
+    const qrData = {
+      studentId: student.id,
+      token: student.qr_code_token,
+      generatedAt: student.created_at || new Date().toISOString(),
+    }
+
+    return JSON.stringify(qrData)
+  }
+
+  const qrData = generateQRData()
+
+  const handleDownload = () => {
+    if (!qrRef.current) return
+
+    const svg = qrRef.current.querySelector('svg')
+    if (!svg) return
+
+    const svgData = new XMLSerializer().serializeToString(svg)
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const img = new Image()
+
+    img.onload = () => {
+      canvas.width = img.width
+      canvas.height = img.height
+      ctx.drawImage(img, 0, 0)
+      const pngFile = canvas.toDataURL('image/png')
+
+      const downloadLink = document.createElement('a')
+      downloadLink.download = `QR-${student.nom}-${student.prenom || 'student'}.png`
+      downloadLink.href = pngFile
+      downloadLink.click()
+    }
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+  }
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleRevoke = async () => {
+    if (
+      !window.confirm(
+        'Êtes-vous sûr de vouloir révoquer ce QR Code ? Il ne pourra plus être utilisé pour les scans.'
+      )
+    ) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await revokeQRCode(student.id)
+      if (result.error) throw result.error
+      toast.success('QR Code révoqué avec succès')
+    } catch (error) {
+      toast.error('Erreur lors de la révocation')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRegenerate = async () => {
+    if (
+      !window.confirm(
+        'Un nouveau QR Code sera généré. L\'ancien sera automatiquement révoqué.'
+      )
+    ) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await onRegenerate(student.id)
+      if (result.error) throw result.error
+      toast.success('QR Code régénéré avec succès')
+    } catch (error) {
+      toast.error('Erreur lors de la régénération')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!qrData) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">
+              Aucun QR Code disponible pour cet étudiant
+            </p>
+            <Button onClick={onClose}>Fermer</Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        {/* En-tête */}
+        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-emsp-green">QR Code</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {student.nom} {student.prenom || ''}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Contenu */}
+        <div className="p-6 space-y-6">
+          {/* QR Code */}
+          <div className="flex justify-center">
+            <div
+              ref={qrRef}
+              className="p-4 bg-white border-2 border-gray-200 rounded-lg"
+            >
+              <QRCodeSVG
+                value={qrData}
+                size={256}
+                level="H"
+                includeMargin={true}
+                fgColor="#2D5016"
+                bgColor="#FFFFFF"
+              />
+            </div>
+          </div>
+
+          {/* Statut */}
+          <div className="text-center">
+            <span
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
+                student.qr_code_status === STATUTS_QR_CODE.ACTIVE
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-red-100 text-red-800'
+              }`}
+            >
+              {student.qr_code_status === STATUTS_QR_CODE.ACTIVE
+                ? 'Actif'
+                : 'Révoqué'}
+            </span>
+          </div>
+
+          {/* Informations */}
+          <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Token:</span>
+              <span className="font-mono text-xs break-all">
+                {student.qr_code_token?.substring(0, 20)}...
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">ID Étudiant:</span>
+              <span className="font-mono text-xs">
+                {student.id?.substring(0, 8)}...
+              </span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              onClick={handleDownload}
+              className="flex items-center justify-center space-x-2"
+            >
+              <Download size={18} />
+              <span>Télécharger</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              className="flex items-center justify-center space-x-2"
+            >
+              <Printer size={18} />
+              <span>Imprimer</span>
+            </Button>
+            {student.qr_code_status === STATUTS_QR_CODE.ACTIVE && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleRevoke}
+                  disabled={loading}
+                  className="flex items-center justify-center space-x-2 text-red-600 hover:text-red-700"
+                >
+                  <Ban size={18} />
+                  <span>Révoquer</span>
+                </Button>
+                <Button
+                  onClick={handleRegenerate}
+                  disabled={loading}
+                  className="flex items-center justify-center space-x-2"
+                >
+                  <RotateCcw size={18} />
+                  <span>Régénérer</span>
+                </Button>
+              </>
+            )}
+          </div>
+
+          {student.qr_code_status === STATUTS_QR_CODE.REVOKED && (
+            <Button
+              onClick={handleRegenerate}
+              disabled={loading}
+              className="w-full flex items-center justify-center space-x-2"
+            >
+              <RotateCcw size={18} />
+              <span>Régénérer un nouveau QR Code</span>
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
