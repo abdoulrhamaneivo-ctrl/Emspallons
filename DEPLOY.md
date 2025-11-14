@@ -10,24 +10,36 @@
 
 ### Étape 1 : Push sur GitHub
 
+**⚠️ IMPORTANT** : GitHub ne supporte plus l'authentification par mot de passe. Vous devez utiliser un **Personal Access Token**.
+
+#### Créer un Personal Access Token
+
+1. Allez sur [github.com/settings/tokens](https://github.com/settings/tokens)
+2. Cliquez sur **"Generate new token"** → **"Generate new token (classic)"**
+3. Donnez un nom : `EMSP Transport Deployment`
+4. Sélectionnez la permission **`repo`** (toutes les permissions)
+5. Cliquez sur **"Generate token"**
+6. **Copiez le token immédiatement** (il ne sera plus visible)
+
+#### Push avec le token
+
+**Option A : Script automatique**
 ```bash
-# Initialiser le dépôt Git
-git init
+./push-with-token.sh
+```
 
-# Ajouter tous les fichiers
-git add .
-
-# Créer le commit initial
-git commit -m "Initial commit: EMSP Transport Scolaire"
-
-# Ajouter le remote GitHub (remplacez par votre URL)
-git remote add origin https://github.com/votre-username/emsp-transport-scolaire.git
-
-# Renommer la branche en main si nécessaire
-git branch -M main
-
-# Pousser sur GitHub
+**Option B : Commande manuelle**
+```bash
+# Le dépôt est déjà initialisé et le commit est créé
+# Utilisez le token comme mot de passe lors du push
 git push -u origin main
+# Username: votre-username-github
+# Password: [collez votre Personal Access Token]
+```
+
+**Option C : Token dans l'URL (plus sécurisé)**
+```bash
+git push https://VOTRE_TOKEN@github.com/abdoulrhamaneivo-ctrl/Emspallons.git main
 ```
 
 **Note** : Si votre dépôt GitHub existe déjà, utilisez :
