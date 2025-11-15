@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Plus, Edit, Trash2, RefreshCw } from 'lucide-react'
 import { Button, Badge, Card, Input, Select } from '../ui'
+import CreateControllerModal from './CreateControllerModal'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
 export default function ControllerManager() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, role } = useAuth()
   const [controllers, setControllers] = useState([])
   const [lines, setLines] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingController, setEditingController] = useState(null)
   const [formData, setFormData] = useState({
     nom: '',
@@ -21,10 +23,10 @@ export default function ControllerManager() {
   const [errors, setErrors] = useState({})
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!isAdmin && role !== ROLES.EDUCATOR) return
     fetchControllers()
     fetchLines()
-  }, [isAdmin])
+  }, [isAdmin, role])
 
   const fetchControllers = async () => {
     try {
@@ -190,16 +192,13 @@ export default function ControllerManager() {
   }
 
   const handleNew = () => {
-    setEditingController(null)
-    setFormData({ nom: '', code: '', ligne_id: '', active: true })
-    setErrors({})
-    setShowForm(true)
+    setShowCreateModal(true)
   }
 
-  if (!isAdmin) {
+  if (!isAdmin && role !== ROLES.EDUCATOR) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Accès réservé aux administrateurs</p>
+        <p className="text-red-600">Accès réservé aux administrateurs et éducateurs</p>
       </div>
     )
   }
@@ -411,6 +410,16 @@ export default function ControllerManager() {
           </div>
         </Card>
       )}
+
+      <CreateControllerModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          setShowCreateModal(false)
+          fetchControllers()
+        }}
+        lines={lines}
+      />
     </div>
   )
 }
