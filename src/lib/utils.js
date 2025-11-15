@@ -46,6 +46,35 @@ export const formatCurrency = (amount) => {
 }
 
 /**
+ * Formate un mois au format français (ex: "novembre 2026")
+ * @param {string} monthStr - Mois au format "yyyy-MM"
+ * @returns {string} Mois formaté en français
+ */
+export const formatMonthFrench = (monthStr) => {
+  if (!monthStr) return ''
+  try {
+    const date = parseISO(monthStr + '-01')
+    return format(date, 'MMMM yyyy', { locale: fr })
+  } catch {
+    return monthStr
+  }
+}
+
+/**
+ * Formate une liste de mois en français (ex: "novembre 2026, décembre 2026")
+ * @param {string[]} months - Liste de mois au format "yyyy-MM"
+ * @returns {string} Mois formatés en français séparés par des virgules
+ */
+export const formatMonthsListFrench = (months) => {
+  if (!months || months.length === 0) return 'Aucun'
+  try {
+    return months.map(m => formatMonthFrench(m)).join(', ')
+  } catch {
+    return months.join(', ')
+  }
+}
+
+/**
  * Calcule le statut de paiement d'un étudiant
  * @param {string|Date} dateDernierPaiement - Date du dernier paiement
  * @param {string|Date} dateEcheance - Date d'échéance

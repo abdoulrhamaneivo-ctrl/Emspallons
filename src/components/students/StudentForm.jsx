@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { X } from 'lucide-react'
 import { Button, Input, Select } from '../ui'
 import { isValidPhone, formatPhone } from '../../lib/utils'
+import { formatPhoneNumber, validatePhoneNumber, detectCountry, getAvailableCountries } from '../../lib/phoneFormatter'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 
@@ -13,6 +14,7 @@ export default function StudentForm({ student, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [lines, setLines] = useState([])
   const [errors, setErrors] = useState({})
+  const [phoneCountry, setPhoneCountry] = useState('CI')
 
   const [formData, setFormData] = useState({
     nom: '',
@@ -21,21 +23,12 @@ export default function StudentForm({ student, onClose, onSuccess }) {
     tuteur: '',
     ligne_id: '',
     point_ramassage: '',
-    promotion: '',
+    niveau: '',
     classe: '',
   })
 
-  // Promotions et classes prédéfinies (à adapter selon vos besoins)
-  const promotions = ['2024', '2025', '2026', '2027', '2028']
-  const classes = [
-    '6ème',
-    '5ème',
-    '4ème',
-    '3ème',
-    'Seconde',
-    'Première',
-    'Terminale',
-  ]
+  const [niveaux, setNiveaux] = useState([])
+  const [classes, setClasses] = useState([])
 
   useEffect(() => {
     // Charger les lignes
@@ -48,10 +41,47 @@ export default function StudentForm({ student, onClose, onSuccess }) {
       
       if (data) setLines(data)
     }
+
+    // Charger les niveaux depuis Supabase
+    const fetchNiveaux = async () => {
+      const { data } = await supabase
+        .from('niveaux')
+        .select('*')
+        .eq('active', true)
+        .order('nom', { ascending: true })
+      
+      if (data) {
+        setNiveaux(data.map(p => p.nom))
+      } else {
+        // Fallback si la table n'existe pas encore
+        setNiveaux(['Licence 1', 'Licence 2', 'Licence 3', 'Master 1', 'Master 2'])
+      }
+    }
+
+    // Charger les classes depuis Supabase
+    const fetchClasses = async () => {
+      const { data } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('active', true)
+        .order('ordre', { ascending: true })
+      
+      if (data) {
+        setClasses(data.map(c => c.nom))
+      } else {
+        // Fallback si la table n'existe pas encore
+        setClasses(['6ème', '5ème', '4ème', '3ème', 'Seconde', 'Première', 'Terminale'])
+      }
+    }
+
     fetchLines()
+    fetchNiveaux()
+    fetchClasses()
 
     // Si on modifie, charger les données
     if (student) {
+      const detectedCountry = student.contact ? detectCountry(student.contact) : 'CI'
+      setPhoneCountry(detectedCountry)
       setFormData({
         nom: student.nom || '',
         prenom: student.prenom || '',
@@ -59,7 +89,7 @@ export default function StudentForm({ student, onClose, onSuccess }) {
         tuteur: student.tuteur || '',
         ligne_id: student.ligne_id || '',
         point_ramassage: student.point_ramassage || '',
-        promotion: student.promotion || '',
+        niveau: student.niveau || '',
         classe: student.classe || '',
       })
     }
@@ -74,8 +104,8 @@ export default function StudentForm({ student, onClose, onSuccess }) {
 
     if (!formData.contact.trim()) {
       newErrors.contact = 'Le contact est requis'
-    } else if (!isValidPhone(formData.contact)) {
-      newErrors.contact = 'Format de téléphone invalide'
+    } else if (!validatePhoneNumber(formData.contact, phoneCountry)) {
+      newErrors.contact = 'Format de téléphone invalide pour ' + getAvailableCountries().find(c => c.code === phoneCountry)?.name
     }
 
     if (!formData.ligne_id) {
@@ -86,8 +116,8 @@ export default function StudentForm({ student, onClose, onSuccess }) {
       newErrors.point_ramassage = 'Le point de ramassage est requis'
     }
 
-    if (!formData.promotion) {
-      newErrors.promotion = 'La promotion est requise'
+    if (!formData.niveau) {
+      newErrors.niveau = 'Le niveau est requis'
     }
 
     if (!formData.classe) {
@@ -111,7 +141,7 @@ export default function StudentForm({ student, onClose, onSuccess }) {
     try {
       const dataToSubmit = {
         ...formData,
-        contact: formatPhone(formData.contact),
+        contact: formatPhoneNumber(formData.contact, phoneCountry),
         created_by: user?.id || null,
       }
 
@@ -186,15 +216,45 @@ export default function StudentForm({ student, onClose, onSuccess }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Contact */}
-            <Input
-              label="Contact *"
-              value={formData.contact}
-              onChange={(e) => handleChange('contact', e.target.value)}
-              error={errors.contact}
-              placeholder="+225 XX XX XX XX XX"
-              required
-            />
+            {/* Contact avec sélection pays */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact *
+              </label>
+              <div className="flex gap-2">
+                <Select
+                  value={phoneCountry}
+                  onChange={(e) => {
+                    setPhoneCountry(e.target.value)
+                    if (formData.contact) {
+                      const formatted = formatPhoneNumber(formData.contact, e.target.value)
+                      handleChange('contact', formatted)
+                    }
+                  }}
+                  className="w-32"
+                >
+                  {getAvailableCountries().map(country => (
+                    <option key={country.code} value={country.code}>
+                      {country.flag} {country.code}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  value={formData.contact}
+                  onChange={(e) => {
+                    const formatted = formatPhoneNumber(e.target.value, phoneCountry)
+                    handleChange('contact', formatted)
+                  }}
+                  error={errors.contact}
+                  required
+                  placeholder="Numéro de téléphone"
+                  className="flex-1"
+                />
+              </div>
+              {errors.contact && (
+                <p className="text-sm text-red-600 mt-1">{errors.contact}</p>
+              )}
+            </div>
 
             {/* Tuteur */}
             <Input
@@ -233,18 +293,18 @@ export default function StudentForm({ student, onClose, onSuccess }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Promotion */}
+            {/* Niveau */}
             <Select
-              label="Promotion *"
-              value={formData.promotion}
-              onChange={(e) => handleChange('promotion', e.target.value)}
-              error={errors.promotion}
+              label="Niveau *"
+              value={formData.niveau}
+              onChange={(e) => handleChange('niveau', e.target.value)}
+              error={errors.niveau}
               required
             >
-              <option value="">Sélectionner une promotion</option>
-              {promotions.map((promo) => (
-                <option key={promo} value={promo}>
-                  {promo}
+              <option value="">Sélectionner un niveau</option>
+              {niveaux.map((niveau) => (
+                <option key={niveau} value={niveau}>
+                  {niveau}
                 </option>
               ))}
             </Select>

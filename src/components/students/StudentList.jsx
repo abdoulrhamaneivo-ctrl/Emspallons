@@ -1,10 +1,14 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStudents } from '../../hooks/useStudents'
-import { Search, Plus, Edit, DollarSign, QrCode, Trash2, Filter, X } from 'lucide-react'
+import { Search, Plus, Edit, DollarSign, QrCode, Trash2, Filter, X, Upload, Download, CreditCard, GraduationCap } from 'lucide-react'
 import { Button, Badge, Card } from '../ui'
+import EmptyState from '../ui/EmptyState'
+import InfoTooltip from '../ui/InfoTooltip'
 import StudentForm from './StudentForm'
 import PaymentModal from '../payments/PaymentModal'
 import QRCodeDisplay from './QRCodeDisplay'
+import StudentCardModal from './StudentCardModal'
+import ImportExportModal from './ImportExportModal'
 import { STATUTS_PAIEMENT } from '../../lib/constants'
 import { getStatusColor, getStatusLabel } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
@@ -22,14 +26,28 @@ export default function StudentList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedLine, setSelectedLine] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
-  const [selectedPromotion, setSelectedPromotion] = useState('all')
+  const [selectedNiveau, setSelectedNiveau] = useState('all')
   const [selectedClasse, setSelectedClasse] = useState('all')
   const [showForm, setShowForm] = useState(false)
   const [editingStudent, setEditingStudent] = useState(null)
   const [paymentStudent, setPaymentStudent] = useState(null)
   const [qrStudent, setQrStudent] = useState(null)
+  const [cardStudent, setCardStudent] = useState(null)
   const [lines, setLines] = useState([])
   const [showFilters, setShowFilters] = useState(false)
+  const [showImportExport, setShowImportExport] = useState(false)
+
+  // Écouter l'événement pour ouvrir le formulaire depuis le dashboard
+  useEffect(() => {
+    const handleOpenForm = () => {
+      setShowForm(true)
+      setEditingStudent(null)
+    }
+    window.addEventListener('open-student-form', handleOpenForm)
+    return () => {
+      window.removeEventListener('open-student-form', handleOpenForm)
+    }
+  }, [])
 
   // Charger les lignes
   useEffect(() => {
@@ -45,9 +63,9 @@ export default function StudentList() {
     fetchLines()
   }, [])
 
-  // Extraire les promotions et classes uniques
-  const promotions = useMemo(() => {
-    const unique = [...new Set(students.map((s) => s.promotion).filter(Boolean))]
+  // Extraire les niveaux et classes uniques
+  const niveaux = useMemo(() => {
+    const unique = [...new Set(students.map((s) => s.niveau).filter(Boolean))]
     return unique.sort()
   }, [students])
 
@@ -76,19 +94,19 @@ export default function StudentList() {
       const statusMatch =
         selectedStatus === 'all' || student.statut_paiement === selectedStatus
 
-      // Filtre promotion
-      const promotionMatch =
-        selectedPromotion === 'all' || student.promotion === selectedPromotion
+      // Filtre niveau
+      const niveauMatch =
+        selectedNiveau === 'all' || student.niveau === selectedNiveau
 
       // Filtre classe
       const classeMatch =
         selectedClasse === 'all' || student.classe === selectedClasse
 
       return (
-        searchMatch && lineMatch && statusMatch && promotionMatch && classeMatch
+        searchMatch && lineMatch && statusMatch && niveauMatch && classeMatch
       )
     })
-  }, [students, searchTerm, selectedLine, selectedStatus, selectedPromotion, selectedClasse])
+  }, [students, searchTerm, selectedLine, selectedStatus, selectedNiveau, selectedClasse])
 
   const handleDelete = async (student) => {
     if (
@@ -178,16 +196,26 @@ export default function StudentList() {
             <span>Filtres</span>
           </Button>
         </div>
-        <Button
-          onClick={() => {
-            setEditingStudent(null)
-            setShowForm(true)
-          }}
-          className="flex items-center space-x-2"
-        >
-          <Plus size={20} />
-          <span>Ajouter un étudiant</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowImportExport(true)}
+            className="flex items-center space-x-2"
+          >
+            <Upload size={20} />
+            <span>Import/Export</span>
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingStudent(null)
+              setShowForm(true)
+            }}
+            className="flex items-center space-x-2"
+          >
+            <Plus size={20} />
+            <span>Ajouter un étudiant</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filtres */}
@@ -220,18 +248,18 @@ export default function StudentList() {
               </select>
             </div>
 
-            {/* Filtre promotion */}
+            {/* Filtre niveau */}
             <div>
-              <label className="label">Promotion</label>
+              <label className="label">Niveau</label>
               <select
-                value={selectedPromotion}
-                onChange={(e) => setSelectedPromotion(e.target.value)}
+                value={selectedNiveau}
+                onChange={(e) => setSelectedNiveau(e.target.value)}
                 className="input"
               >
-                <option value="all">Toutes les promotions</option>
-                {promotions.map((promo) => (
-                  <option key={promo} value={promo}>
-                    {promo}
+                <option value="all">Tous les niveaux</option>
+                {niveaux.map((niveau) => (
+                  <option key={niveau} value={niveau}>
+                    {niveau}
                   </option>
                 ))}
               </select>
@@ -344,7 +372,7 @@ export default function StudentList() {
                     {student.nom} {student.prenom || ''}
                   </h3>
                   <p className="text-sm text-gray-600">{student.classe}</p>
-                  <p className="text-xs text-gray-500">{student.promotion}</p>
+                  <p className="text-xs text-gray-500">{student.niveau}</p>
                 </div>
               </div>
 
@@ -378,9 +406,23 @@ export default function StudentList() {
 
               {/* Statut paiement */}
               <div className="mb-4">
-                <Badge status={student.statut_paiement}>
-                  {getStatusLabel(student.statut_paiement)}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <Badge status={student.statut_paiement}>
+                    {getStatusLabel(student.statut_paiement)}
+                  </Badge>
+                  {student.months_ledger && (() => {
+                    const currentMonth = new Date().toISOString().slice(0, 7)
+                    const futureSessions = student.months_ledger.filter(s => s > currentMonth)
+                    if (futureSessions.length > 0) {
+                      return (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                          Paiement anticipé
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
+                </div>
               </div>
 
               {/* Actions */}
@@ -403,6 +445,14 @@ export default function StudentList() {
                 >
                   <DollarSign size={16} />
                   <span>Payer</span>
+                </button>
+                <button
+                  onClick={() => setCardStudent(student)}
+                  className="flex-1 px-3 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
+                  title="Voir la carte"
+                >
+                  <CreditCard size={16} />
+                  <span>Carte</span>
                 </button>
                 <button
                   onClick={() => setQrStudent(student)}
@@ -455,6 +505,24 @@ export default function StudentList() {
           onRegenerate={regenerateQRCode}
         />
       )}
+
+      {cardStudent && (
+        <StudentCardModal
+          isOpen={!!cardStudent}
+          onClose={() => setCardStudent(null)}
+          student={cardStudent}
+        />
+      )}
+
+      <ImportExportModal
+        isOpen={showImportExport}
+        onClose={() => setShowImportExport(false)}
+        students={students}
+        lines={lines}
+        onImportSuccess={() => {
+          // Le hook useStudents se mettra à jour automatiquement
+        }}
+      />
     </div>
   )
 }

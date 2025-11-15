@@ -1,10 +1,13 @@
 import { useState, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { X, Download, Printer, RotateCcw, Ban } from 'lucide-react'
+import { X, Download, Printer, RotateCcw, Ban, MessageCircle, Send } from 'lucide-react'
 import { Button } from '../ui'
 import { useStudents } from '../../hooks/useStudents'
 import toast from 'react-hot-toast'
 import { STATUTS_QR_CODE } from '../../lib/constants'
+import { sendQRCodeWhatsApp } from '../../services/whatsappAutoService'
+import { formatMonthFrench, formatMonthsListFrench } from '../../lib/utils'
+import logger from '../../lib/logger'
 
 export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
   const { revokeQRCode } = useStudents()
@@ -93,6 +96,58 @@ export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
       toast.success('QR Code régénéré avec succès')
     } catch (error) {
       toast.error('Erreur lors de la régénération')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSendWhatsApp = async () => {
+    if (!student.contact) {
+      toast.error('Contact de l\'étudiant non disponible')
+      return
+    }
+
+    if (!qrRef.current) {
+      toast.error('QR Code non disponible')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Calculer période de validité
+      const lastMonth = student.months_ledger?.[student.months_ledger.length - 1]
+      const expirationText = lastMonth ? formatMonthFrench(lastMonth) : 'Non défini'
+
+      // Créer le message WhatsApp
+      const message = `Bonjour ${student.prenom || ''} ${student.nom},
+
+🎫 Votre QR Code de transport EMSP
+
+Présentez ce code au contrôleur lors de l'embarquement.
+
+📅 Valide jusqu'au : ${expirationText}
+
+⚠️ En cas de perte, contactez l'administration.
+
+École EMSP`
+
+      // Nettoyer le numéro de téléphone
+      const cleanPhone = student.contact.replace(/\D/g, '')
+      const encodedMessage = encodeURIComponent(message)
+      
+      // Ouvrir WhatsApp avec le message
+      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+      window.open(whatsappUrl, '_blank')
+      
+      toast.success('WhatsApp ouvert. Partagez le QR code manuellement depuis la page.')
+      
+      // Essayer d'envoyer via l'API si disponible (en arrière-plan, non bloquant)
+      sendQRCodeWhatsApp(student.id).catch(err => {
+        logger.debug('Envoi WhatsApp API non disponible, utilisation manuelle', err)
+      })
+    } catch (error) {
+      logger.error('Erreur lors de l\'envoi par WhatsApp', error)
+      toast.error('Erreur lors de l\'ouverture de WhatsApp')
     } finally {
       setLoading(false)
     }
@@ -187,6 +242,7 @@ export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
             <Button
               variant="outline"
               onClick={handleDownload}
+              disabled={loading}
               className="flex items-center justify-center space-x-2"
             >
               <Download size={18} />
@@ -195,6 +251,7 @@ export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
             <Button
               variant="outline"
               onClick={handlePrint}
+              disabled={loading}
               className="flex items-center justify-center space-x-2"
             >
               <Printer size={18} />
@@ -202,6 +259,14 @@ export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
             </Button>
             {student.qr_code_status === STATUTS_QR_CODE.ACTIVE && (
               <>
+                <Button
+                  onClick={handleSendWhatsApp}
+                  disabled={loading || !student.contact}
+                  className="flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <MessageCircle size={18} />
+                  <span>Envoyer par WhatsApp</span>
+                </Button>
                 <Button
                   variant="outline"
                   onClick={handleRevoke}

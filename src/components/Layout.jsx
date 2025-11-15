@@ -1,131 +1,61 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { LogOut, Menu, X } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { useState } from 'react'
-import toast from 'react-hot-toast'
+import { useBreakpoint } from '../hooks/useBreakpoint'
+import Sidebar from './navigation/Sidebar'
+import BottomNav from './navigation/BottomNav'
+import Logo from './ui/Logo'
 
 export default function Layout({ children }) {
-  const { user, role, signOut } = useAuth()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-      toast.success('Déconnexion réussie')
-      navigate('/login')
-    } catch (error) {
-      toast.error('Erreur lors de la déconnexion')
-    }
-  }
-
-  const isActive = (path) => location.pathname === path
-
-  const navItems = [
-    ...(role === 'admin' || role === 'educator'
-      ? [
-          { path: '/dashboard', label: 'Tableau de bord' },
-          { path: '/students', label: 'Étudiants' },
-          { path: '/payments', label: 'Paiements' },
-        ]
-      : []),
-    ...(role === 'admin'
-      ? [{ path: '/admin', label: 'Administration' }]
-      : []),
-    ...(role === 'controller'
-      ? [{ path: '/scan', label: 'Scanner QR' }]
-      : []),
-  ]
+  const { user, role } = useAuth()
+  const { isMobile, isTablet, isDesktop } = useBreakpoint()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-emsp-green text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link to="/" className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-emsp-yellow rounded-lg flex items-center justify-center">
-                  <span className="text-emsp-green font-bold text-xl">E</span>
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-green-50 to-emsp-green/5 flex">
+      {/* Sidebar - Desktop et Tablet */}
+      {!isMobile && (
+        <Sidebar 
+          isOpen={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)}
+          isTablet={isTablet}
+        />
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header - Desktop et Tablet */}
+        {!isMobile && (
+          <header className="bg-gradient-to-r from-emsp-green to-emsp-green/90 text-white shadow-md">
+            <div className="px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                {isTablet && (
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="p-2 hover:bg-emsp-green/20 rounded-lg transition-colors"
+                  >
+                    <Menu size={24} />
+                  </button>
+                )}
+                <div className="flex items-center flex-1 justify-center md:justify-start">
+                  <Link to="/dashboard" className="flex items-center space-x-2">
+                    <Logo size="md" showText={!isTablet} variant="transport" />
+                  </Link>
                 </div>
-                <span className="font-bold text-xl">EMSP Transport</span>
-              </Link>
+              </div>
             </div>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex space-x-4">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive(item.path)
-                      ? 'bg-emsp-yellow text-emsp-green'
-                      : 'hover:bg-emsp-green-light'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-              {user && (
-                <button
-                  onClick={handleSignOut}
-                  className="px-3 py-2 rounded-md text-sm font-medium hover:bg-emsp-green-light flex items-center space-x-1"
-                >
-                  <LogOut size={16} />
-                  <span>Déconnexion</span>
-                </button>
-              )}
-            </nav>
-
-            {/* Mobile menu button */}
-            <button
-              className="md:hidden p-2"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-emsp-green-light">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    isActive(item.path)
-                      ? 'bg-emsp-yellow text-emsp-green'
-                      : 'hover:bg-emsp-green-light'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-              {user && (
-                <button
-                  onClick={handleSignOut}
-                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-emsp-green-light flex items-center space-x-2"
-                >
-                  <LogOut size={16} />
-                  <span>Déconnexion</span>
-                </button>
-              )}
-            </div>
-          </div>
+          </header>
         )}
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+        {/* Main Content */}
+        <main className={`flex-1 overflow-y-auto ${isMobile ? 'pb-20' : 'p-4 sm:p-6 lg:p-8'}`}>
+          {children}
+        </main>
+      </div>
+
+      {/* Bottom Navigation - Mobile only */}
+      {isMobile && <BottomNav />}
     </div>
   )
 }
-

@@ -1,0 +1,51 @@
+/* Styles d'impression pour les cartes étudiantes */
+
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  /* Masquer les éléments non nécessaires */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Container pour les cartes */
+  .card-print-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    page-break-inside: avoid;
+    margin-bottom: 1cm;
+    padding: 0.5cm;
+  }
+
+  /* Carte individuelle */
+  .student-card-print {
+    width: 8.5cm;
+    height: 5.5cm;
+    page-break-inside: avoid;
+    margin: 0.5cm;
+  }
+
+  /* Ligne de découpe */
+  .cut-line {
+    border-top: 1px dashed #ccc;
+    margin: 0.5cm 0;
+    page-break-after: always;
+  }
+
+  /* 2 cartes par page */
+  @page {
+    size: A4;
+    margin: 1cm;
+  }
+
+  /* Éviter les sauts de page dans les cartes */
+  .student-card-print {
+    break-inside: avoid;
+  }
+}
+

@@ -1,22 +1,83 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
-import { Plus, DollarSign } from 'lucide-react'
+import { Plus, DollarSign, Download, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { motion } from 'framer-motion'
+import AnimatedCard from '../components/ui/AnimatedCard'
+import AnimatedButton from '../components/ui/AnimatedButton'
+import AnimatedCounter from '../components/ui/AnimatedCounter'
+import AnimatedBadge from '../components/ui/AnimatedBadge'
+import PageTransition from '../components/ui/PageTransition'
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton'
+import PaymentModal from '../components/payments/PaymentModal'
+import SelectStudentModal from '../components/payments/SelectStudentModal'
+import ReceiptPreviewModal from '../components/payments/ReceiptPreviewModal'
+import { useStudents } from '../hooks/useStudents'
+import { generateReceiptPDF, downloadReceipt } from '../services/receiptService'
 
 export default function Payments() {
+  const location = useLocation()
+  const { students } = useStudents()
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showSelectStudent, setShowSelectStudent] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState(null)
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false)
+  const [selectedPayment, setSelectedPayment] = useState(null)
+  const [selectedPaymentStudent, setSelectedPaymentStudent] = useState(null)
 
   useEffect(() => {
     fetchPayments()
   }, [])
 
+  // Gérer l'ouverture du modal depuis le dashboard
+  useEffect(() => {
+    // Vérifier si on vient du dashboard avec openPayment ou sessionStorage
+    const shouldOpen = location.state?.openPayment || sessionStorage.getItem('openPaymentForm')
+    
+    if (shouldOpen) {
+      // Nettoyer sessionStorage
+      sessionStorage.removeItem('openPaymentForm')
+      // Attendre un peu pour que la page soit chargée
+      setTimeout(() => {
+        setShowSelectStudent(true)
+      }, 300)
+    }
+
+    // Écouter l'événement custom
+    const handleOpenPayment = () => {
+      setShowSelectStudent(true)
+    }
+    window.addEventListener('open-payment-form', handleOpenPayment)
+
+    return () => {
+      window.removeEventListener('open-payment-form', handleOpenPayment)
+    }
+  }, [location.state])
+
   const fetchPayments = async () => {
     try {
       const { data, error } = await supabase
         .from('payments')
-        .select('*, students(first_name, last_name, student_id)')
+        .select(`
+          *,
+          students:student_id (
+            id,
+            nom,
+            prenom,
+            classe,
+            niveau,
+            ligne_id,
+            lines:ligne_id (
+              id,
+              nom,
+              couleur
+            )
+          )
+        `)
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -30,84 +91,207 @@ export default function Payments() {
     }
   }
 
-  const totalAmount = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
+  const handleDownloadReceipt = async (payment) => {
+    try {
+      // Récupérer les données complètes de l'étudiant
+      const student = payment.students
+      if (!student) {
+        toast.error('Données étudiant introuvables')
+        return
+      }
+
+      const doc = await generateReceiptPDF(payment, student)
+      const studentName = `${student.nom} ${student.prenom || ''}`.trim()
+      downloadReceipt(doc, studentName, payment.created_at || new Date().toISOString())
+      toast.success('Reçu téléchargé')
+    } catch (error) {
+      console.error('Erreur lors du téléchargement du reçu:', error)
+      toast.error('Erreur lors de la génération du reçu')
+    }
+  }
+
+  const handlePreviewReceipt = async (payment) => {
+    try {
+      const student = payment.students
+      if (!student) {
+        toast.error('Données étudiant introuvables')
+        return
+      }
+
+      setSelectedPayment(payment)
+      setSelectedPaymentStudent(student)
+      setShowReceiptPreview(true)
+    } catch (error) {
+      console.error('Erreur lors de l\'ouverture de la prévisualisation:', error)
+      toast.error('Erreur lors de l\'ouverture de la prévisualisation')
+    }
+  }
+
+  const totalAmount = payments.reduce((sum, payment) => sum + (payment.montant_total || 0), 0)
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-emsp-green">Paiements</h1>
-          <button className="btn-primary flex items-center space-x-2">
-            <Plus size={20} />
-            <span>Nouveau paiement</span>
-          </button>
-        </div>
-
-        {/* Summary Card */}
-        <div className="card bg-gradient-to-r from-emsp-green to-emsp-green-light text-white">
-          <div className="flex items-center justify-between">
+      <PageTransition>
+        <div className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-between items-center"
+          >
             <div>
-              <p className="text-sm opacity-90 mb-1">Total ce mois</p>
-              <p className="text-3xl font-bold">{totalAmount.toFixed(2)} €</p>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent">
+                Paiements
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Gérez les paiements des étudiants
+              </p>
             </div>
-            <DollarSign size={48} className="opacity-80" />
-          </div>
+            <AnimatedButton 
+              variant="primary" 
+              className="flex items-center space-x-2"
+              onClick={() => setShowSelectStudent(true)}
+            >
+              <Plus size={20} />
+              <span>Nouveau paiement</span>
+            </AnimatedButton>
+          </motion.div>
+
+          {/* Summary Card */}
+          <AnimatedCard delay={0.1} className="bg-gradient-to-r from-emsp-green via-emsp-lightGreen to-emsp-green text-white p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-90 mb-2">Total ce mois</p>
+                <p className="text-3xl font-bold">
+                  <AnimatedCounter
+                    value={totalAmount}
+                    prefix=""
+                    suffix=" FCFA"
+                    decimals={0}
+                  />
+                </p>
+              </div>
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+              >
+                <DollarSign size={48} className="opacity-80" />
+              </motion.div>
+            </div>
+          </AnimatedCard>
+
+          {/* Payments List */}
+          <AnimatedCard delay={0.2} className="p-6">
+            {loading ? (
+              <LoadingSkeleton count={5} />
+            ) : payments.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <DollarSign size={48} className="mx-auto mb-4 text-gray-300" />
+                <p>Aucun paiement enregistré</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {payments.map((payment, index) => (
+                  <motion.div
+                    key={payment.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="border-2 border-gray-200 rounded-xl p-4 hover:border-emsp-lightGreen hover:shadow-md transition-all duration-300"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold text-emsp-green text-lg">
+                          {payment.students?.nom || ''} {payment.students?.prenom || ''}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {new Date(payment.created_at).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                        </p>
+                        {payment.nombre_mois && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {payment.nombre_mois} mois payé(s)
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold bg-gradient-to-r from-emsp-yellow to-emsp-green bg-clip-text text-transparent">
+                          {Intl.NumberFormat('fr-FR').format(payment.montant_total || 0)} FCFA
+                        </p>
+                        <div className="mt-2 flex items-center justify-end space-x-2">
+                          <AnimatedBadge
+                            variant={payment.status === 'completed' ? 'success' : 'warning'}
+                          >
+                            {payment.status === 'completed' ? 'Payé' : 'En attente'}
+                          </AnimatedBadge>
+                          <AnimatedButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePreviewReceipt(payment)}
+                            className="flex items-center space-x-1"
+                            title="Prévisualiser le reçu"
+                          >
+                            <Eye size={16} />
+                          </AnimatedButton>
+                          <AnimatedButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadReceipt(payment)}
+                            className="flex items-center space-x-1"
+                            title="Télécharger le reçu"
+                          >
+                            <Download size={16} />
+                          </AnimatedButton>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </AnimatedCard>
         </div>
 
-        {/* Payments List */}
-        <div className="card">
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emsp-yellow mx-auto"></div>
-            </div>
-          ) : payments.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              Aucun paiement enregistré
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {payments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold text-emsp-green">
-                        {payment.students?.first_name}{' '}
-                        {payment.students?.last_name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        ID: {payment.students?.student_id}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {new Date(payment.created_at).toLocaleDateString('fr-FR')}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold text-emsp-green">
-                        {payment.amount?.toFixed(2)} €
-                      </p>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          payment.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {payment.status === 'completed'
-                          ? 'Payé'
-                          : 'En attente'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+        {/* Modals */}
+        <SelectStudentModal
+          isOpen={showSelectStudent}
+          onClose={() => setShowSelectStudent(false)}
+          onSelect={(student) => {
+            setSelectedStudent(student)
+            setShowPaymentModal(true)
+          }}
+        />
+
+        {selectedStudent && showPaymentModal && (
+          <PaymentModal
+            student={selectedStudent}
+            onClose={() => {
+              setShowPaymentModal(false)
+              setSelectedStudent(null)
+            }}
+            onSuccess={() => {
+              setShowPaymentModal(false)
+              setSelectedStudent(null)
+              fetchPayments()
+            }}
+          />
+        )}
+
+        {selectedPayment && selectedPaymentStudent && (
+          <ReceiptPreviewModal
+            isOpen={showReceiptPreview}
+            onClose={() => {
+              setShowReceiptPreview(false)
+              setSelectedPayment(null)
+              setSelectedPaymentStudent(null)
+            }}
+            payment={selectedPayment}
+            student={selectedPaymentStudent}
+          />
+        )}
+      </PageTransition>
     </Layout>
   )
 }
-

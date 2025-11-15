@@ -1,50 +1,46 @@
 import { createClient } from '@supabase/supabase-js'
+import { env } from './env'
+import logger from './logger'
 
-// Variables d'environnement
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Créer le client avec les variables validées
+export const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})
 
-// Vérification des variables d'environnement
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '⚠️ Variables d\'environnement Supabase manquantes.\n' +
-    'Créez un fichier .env.local avec:\n' +
-    'VITE_SUPABASE_URL=votre_url\n' +
-    'VITE_SUPABASE_ANON_KEY=votre_cle'
-  )
-}
-
-// Client Supabase initialisé
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  }
-)
+logger.info('Supabase client initialisé', {
+  url: env.SUPABASE_URL.substring(0, 30) + '...'
+})
 
 // Helper pour vérifier le rôle de l'utilisateur
 export const getUserRole = async (userId) => {
-  if (!userId) return null
+  if (!userId) {
+    logger.warn('getUserRole: userId is null or undefined')
+    return null
+  }
 
   try {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('role')
       .eq('id', userId)
       .single()
     
     if (error) {
-      console.error('Error fetching user role:', error)
+      logger.error('Error fetching user role', error, { userId })
+      // Si le profil n'existe pas, c'est un problème grave
+      if (error.code === 'PGRST116') {
+        logger.error('Profile not found for user', null, { userId })
+      }
       return null
     }
     
-    return data?.role
+    logger.debug('getUserRole result:', { userId, role: data?.role })
+    return data?.role || null
   } catch (error) {
-    console.error('Error in getUserRole:', error)
+    logger.error('Error in getUserRole', error, { userId })
     return null
   }
 }
@@ -55,19 +51,19 @@ export const getUserProfile = async (userId) => {
 
   try {
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
     
     if (error) {
-      console.error('Error fetching user profile:', error)
+      logger.error('Error fetching user profile', error, { userId })
       return null
     }
     
     return data
   } catch (error) {
-    console.error('Error in getUserProfile:', error)
+    logger.error('Error in getUserProfile', error, { userId })
     return null
   }
 }

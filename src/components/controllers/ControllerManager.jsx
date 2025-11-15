@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Plus, Edit, Trash2, RefreshCw } from 'lucide-react'
+import { Plus, Edit, Trash2, RefreshCw, KeyRound } from 'lucide-react'
 import { Button, Badge, Card, Input, Select } from '../ui'
 import CreateControllerModal from './CreateControllerModal'
+import ResetControllerPasswordModal from './ResetControllerPasswordModal'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import { ROLES } from '../../lib/constants'
 
 export default function ControllerManager() {
-  const { isAdmin, role } = useAuth()
+  const { isAdmin, role, user } = useAuth()
   const [controllers, setControllers] = useState([])
   const [lines, setLines] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
+  const [selectedController, setSelectedController] = useState(null)
   const [editingController, setEditingController] = useState(null)
   const [formData, setFormData] = useState({
     nom: '',
@@ -160,8 +164,8 @@ export default function ControllerManager() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce contrôleur ?')) {
+  const handleDelete = async (controller) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le contrôleur "${controller.nom}" ?`)) {
       return
     }
 
@@ -169,15 +173,38 @@ export default function ControllerManager() {
       const { error } = await supabase
         .from('controllers')
         .delete()
-        .eq('id', id)
+        .eq('id', controller.id)
 
-      if (error) throw error
+      if (error) {
+        // Vérifier si c'est une erreur de permission
+        if (error.message?.includes('policy') || error.code === '42501') {
+          toast.error('Vous n\'avez pas la permission de supprimer ce contrôleur. Seuls les admins peuvent supprimer n\'importe quel contrôleur.')
+        } else {
+          throw error
+        }
+        return
+      }
+      
       toast.success('Contrôleur supprimé')
       fetchControllers()
     } catch (error) {
-      toast.error('Erreur lors de la suppression')
+      toast.error(error.message || 'Erreur lors de la suppression')
       console.error(error)
     }
+  }
+
+  const canModifyPassword = (controller) => {
+    // Les admins peuvent modifier tous les mots de passe
+    if (isAdmin) return true
+    // Les créateurs peuvent modifier leurs propres contrôleurs
+    return controller.created_by === user?.id
+  }
+
+  const canDelete = (controller) => {
+    // Les admins peuvent supprimer tous les contrôleurs
+    if (isAdmin) return true
+    // Les créateurs peuvent supprimer leurs propres contrôleurs
+    return controller.created_by === user?.id
   }
 
   const handleEdit = (controller) => {
@@ -394,13 +421,27 @@ export default function ControllerManager() {
                         >
                           <Edit size={18} />
                         </button>
-                        <button
-                          onClick={() => handleDelete(controller.id)}
-                          className="text-red-600 hover:text-red-700"
-                          title="Supprimer"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {canModifyPassword(controller) && (
+                          <button
+                            onClick={() => {
+                              setSelectedController(controller)
+                              setShowResetPasswordModal(true)
+                            }}
+                            className="text-blue-600 hover:text-blue-700"
+                            title="Modifier le mot de passe"
+                          >
+                            <KeyRound size={18} />
+                          </button>
+                        )}
+                        {canDelete(controller) && (
+                          <button
+                            onClick={() => handleDelete(controller)}
+                            className="text-red-600 hover:text-red-700"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -420,6 +461,20 @@ export default function ControllerManager() {
         }}
         lines={lines}
       />
+
+      {selectedController && (
+        <ResetControllerPasswordModal
+          isOpen={showResetPasswordModal}
+          onClose={() => {
+            setShowResetPasswordModal(false)
+            setSelectedController(null)
+          }}
+          controller={selectedController}
+          onSuccess={() => {
+            fetchControllers()
+          }}
+        />
+      )}
     </div>
   )
 }

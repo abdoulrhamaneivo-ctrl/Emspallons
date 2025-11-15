@@ -20,8 +20,40 @@ export default function ScanHistory() {
   const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
-    fetchScans()
-    fetchControllers()
+    let mounted = true
+    
+    const loadData = async () => {
+      if (mounted) {
+        await fetchScans()
+        await fetchControllers()
+      }
+    }
+    
+    loadData()
+    
+    // Abonnement temps réel pour synchronisation
+    const subscription = supabase
+      .channel('scan_logs_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scan_logs',
+        },
+        () => {
+          // Rafraîchir les scans quand il y a un changement
+          if (mounted) {
+            fetchScans()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const fetchScans = async () => {
@@ -35,15 +67,22 @@ export default function ScanHistory() {
             id,
             nom,
             prenom,
-            classe
+            classe,
+            contact
           ),
           controllers:controller_id (
             id,
-            nom
+            nom,
+            ligne_id,
+            lines:ligne_id (
+              id,
+              nom,
+              couleur
+            )
           )
         `)
         .order('scanned_at', { ascending: false })
-        .limit(100)
+        .limit(500)
 
       // Appliquer les filtres
       if (filters.dateFrom) {
@@ -99,7 +138,7 @@ export default function ScanHistory() {
 
   useEffect(() => {
     fetchScans()
-  }, [filters.dateFrom, filters.dateTo, filters.controllerId, filters.statut])
+  }, [filters.dateFrom, filters.dateTo, filters.controllerId, filters.statut, filters.search])
 
   const handleExportCSV = () => {
     const headers = ['Date/Heure', 'Étudiant', 'Classe', 'Contrôleur', 'Statut', 'Raison']

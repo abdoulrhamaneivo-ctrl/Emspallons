@@ -1,13 +1,16 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import Layout from '../components/Layout'
-import { Users, Settings, BarChart3, UserCheck, History } from 'lucide-react'
+import { Users, Settings, BarChart3, UserCheck, History, Route, DollarSign, AlertTriangle, Trash2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AnimatedCard from '../components/ui/AnimatedCard'
 import PageTransition from '../components/ui/PageTransition'
 import { useAuth } from '../context/AuthContext'
+import ResetDatabaseModal from '../components/admin/ResetDatabaseModal'
 
 export default function Admin() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, role } = useAuth()
+  const [showResetModal, setShowResetModal] = useState(false)
   
   const adminSections = [
     {
@@ -32,11 +35,11 @@ export default function Admin() {
       path: '/admin/classes',
     },
     ...(isAdmin ? [{
-      title: 'Gestion des promotions',
-      description: 'Créer et modifier les promotions disponibles',
+      title: 'Gestion des niveaux',
+      description: 'Créer et modifier les niveaux disponibles',
       icon: BarChart3,
       color: 'bg-emsp-green',
-      path: '/admin/promotions',
+      path: '/admin/niveaux',
     }] : []),
     {
       title: 'Historique des scans',
@@ -45,6 +48,29 @@ export default function Admin() {
       color: 'bg-emsp-lightGreen',
       path: '/admin/scan-history',
     },
+    ...(isAdmin ? [
+      {
+        title: 'Historique des activités',
+        description: 'Traçabilité complète de toutes les actions sur la plateforme',
+        icon: History,
+        color: 'bg-emsp-yellow',
+        path: '/admin/activity-logs',
+      },
+      {
+        title: 'Gestion des lignes',
+        description: 'Créer et modifier les lignes de bus',
+        icon: Route,
+        color: 'bg-emsp-lightGreen',
+        path: '/parametres/lignes',
+      },
+      {
+        title: 'Gestion des prix',
+        description: 'Configurer les prix mensuels et l\'historique',
+        icon: DollarSign,
+        color: 'bg-emsp-yellow',
+        path: '/parametres/prix',
+      },
+    ] : []),
   ]
 
   return (
@@ -97,8 +123,49 @@ export default function Admin() {
               )
             })}
           </div>
+
+          {/* Zone Dangereuse - Seulement pour les admins */}
+          {isAdmin && (
+            <div className="mt-8 border-2 border-red-500 rounded-lg p-6 bg-red-50">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <h2 className="text-xl font-bold text-red-700 mb-4 flex items-center gap-2">
+                  <AlertTriangle className="w-6 h-6" />
+                  Zone Dangereuse
+                </h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-red-600 mb-2">
+                      Réinitialiser la base de données
+                    </h3>
+                    <p className="text-gray-600 mb-4">
+                      Supprime toutes les données (étudiants, paiements, contrôleurs, etc.)
+                      sauf les comptes administrateurs. Un backup sera créé automatiquement.
+                    </p>
+                    <button
+                      onClick={() => setShowResetModal(true)}
+                      className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      Réinitialiser tout
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
         </div>
       </PageTransition>
+
+      {/* Modal de réinitialisation */}
+      <ResetDatabaseModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+      />
     </Layout>
   )
 }

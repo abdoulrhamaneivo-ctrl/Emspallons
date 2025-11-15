@@ -1,0 +1,100 @@
+import { useEffect, useRef } from 'react'
+import { useBreakpoint } from '../../hooks/useBreakpoint'
+import { LogOut, History } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+
+/**
+ * Wrapper pour améliorer le scanner sur mobile
+ */
+export default function ScannerMobile({ children }) {
+  const { isMobile } = useBreakpoint()
+  const navigate = useNavigate()
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    if (!isMobile) return
+
+    // Verrouiller l'orientation en mode paysage pour le scanner
+    const lockOrientation = async () => {
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape')
+        }
+      } catch (error) {
+        console.log('Orientation lock not supported:', error)
+      }
+    }
+
+    // Vibration haptique pour feedback
+    const vibrate = (pattern = [10]) => {
+      if ('vibrate' in navigator) {
+        navigator.vibrate(pattern)
+      }
+    }
+
+    // Exposer la fonction de vibration
+    window.scannerVibrate = vibrate
+
+    // Lock orientation au montage
+    lockOrientation()
+
+    return () => {
+      // Déverrouiller l'orientation au démontage
+      try {
+        if (screen.orientation && screen.orientation.unlock) {
+          screen.orientation.unlock()
+        }
+      } catch (error) {
+        console.log('Orientation unlock error:', error)
+      }
+      delete window.scannerVibrate
+    }
+  }, [isMobile])
+
+  if (!isMobile) {
+    return <>{children}</>
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="scanner-container fixed inset-0 bg-black z-50"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
+      {/* Zone de scan (plein écran) */}
+      <div className="flex-1 flex items-center justify-center">
+        {children}
+      </div>
+
+      {/* Contrôles en bas (zone safe) */}
+      <div className="scanner-controls flex justify-center items-center gap-4">
+        <button
+          onClick={() => navigate('/scanner/historique')}
+          className="scanner-button bg-emsp-green text-white flex items-center justify-center gap-2"
+          style={{ minWidth: '48px', minHeight: '48px' }}
+        >
+          <History size={20} />
+          <span className="hidden sm:inline">Historique</span>
+        </button>
+        <button
+          onClick={() => {
+            sessionStorage.removeItem('controller_session')
+            navigate('/scan')
+          }}
+          className="scanner-button bg-red-600 text-white flex items-center justify-center gap-2"
+          style={{ minWidth: '48px', minHeight: '48px' }}
+        >
+          <LogOut size={20} />
+          <span className="hidden sm:inline">Déconnexion</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+

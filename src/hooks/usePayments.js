@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -7,14 +7,14 @@ export const usePayments = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const fetchPayments = async (filters = {}) => {
+  const fetchPayments = useCallback(async (filters = {}) => {
     try {
       setLoading(true)
       setError(null)
       
       let query = supabase
         .from('payments')
-        .select('*, students(first_name, last_name, student_id)')
+        .select('*, students(nom, prenom, id)')
         .order('created_at', { ascending: false })
 
       if (filters.studentId) {
@@ -42,18 +42,44 @@ export const usePayments = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
+    let mounted = true
+    
     fetchPayments()
-  }, [])
+    
+    // Abonnement temps réel pour synchronisation
+    const subscription = supabase
+      .channel('payments_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments',
+        },
+        () => {
+          // Rafraîchir les paiements quand il y a un changement
+          if (mounted) {
+            fetchPayments()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [fetchPayments])
 
   const createPayment = async (paymentData) => {
     try {
       const { data, error: createError } = await supabase
         .from('payments')
         .insert([paymentData])
-        .select('*, students(first_name, last_name, student_id)')
+        .select('*, students(nom, prenom, id)')
         .single()
 
       if (createError) throw createError
@@ -72,7 +98,7 @@ export const usePayments = () => {
         .from('payments')
         .update(paymentData)
         .eq('id', id)
-        .select('*, students(first_name, last_name, student_id)')
+        .select('*, students(nom, prenom, id)')
         .single()
 
       if (updateError) throw updateError
