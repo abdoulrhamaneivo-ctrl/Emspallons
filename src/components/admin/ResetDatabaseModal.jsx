@@ -79,36 +79,59 @@ export default function ResetDatabaseModal({ isOpen, onClose }) {
         timestamp: new Date().toISOString()
       })
       
-      // Appel à la fonction de réinitialisation
+      // Appel à la fonction de réinitialisation avec gestion d'erreur améliorée
       const { data, error } = await supabase.rpc('reset_database_except_admins')
       
       if (error) {
-        logger.error('Erreur réinitialisation', error)
+        logger.error('Erreur réinitialisation', { 
+          error: error.message || error,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        })
+        
+        // Vérifier si c'est une erreur de permission ou de fonction non trouvée
+        if (error.code === '42883' || error.message?.includes('does not exist')) {
+          toast.error('La fonction de réinitialisation n\'est pas disponible. Contactez un administrateur système.')
+          return
+        }
+        
         throw error
       }
       
-      logger.info('Réinitialisation terminée', data)
+      logger.info('Réinitialisation terminée', { 
+        data: data || {},
+        timestamp: new Date().toISOString()
+      })
       
       // Log dans activity_logs (si la table existe et l'utilisateur est admin)
       try {
-        const { data: user } = await supabase.auth.getUser()
-        if (user?.user) {
+        const { data: user, error: userError } = await supabase.auth.getUser()
+        if (userError) {
+          logger.debug('Impossible de récupérer l\'utilisateur pour le log', userError)
+        } else if (user?.user) {
           await supabase.from('activity_logs').insert({
             action_type: 'DATABASE_RESET',
             entity_type: 'SYSTEM',
             user_id: user.user.id,
             details: {
-              deleted_counts: data,
+              deleted_counts: data || {},
               backup_created: !!backupData,
               timestamp: new Date().toISOString()
             }
           }).catch((logErr) => {
             // Si la table n'existe pas ou erreur, continuer quand même
-            logger.debug('Impossible d\'enregistrer dans activity_logs', logErr)
+            logger.debug('Impossible d\'enregistrer dans activity_logs', {
+              error: logErr?.message || logErr,
+              code: logErr?.code
+            })
           })
         }
       } catch (logError) {
-        logger.debug('Erreur lors de l\'enregistrement du log', logError)
+        // Erreur non bloquante pour le log
+        logger.debug('Erreur lors de l\'enregistrement du log', {
+          error: logError?.message || logError
+        })
       }
       
       toast.success('Base de données réinitialisée avec succès', {
@@ -124,8 +147,26 @@ export default function ResetDatabaseModal({ isOpen, onClose }) {
       }, 2000)
       
     } catch (error) {
-      logger.error('Erreur réinitialisation', error)
-      toast.error(error.message || 'Erreur lors de la réinitialisation')
+      // Gestion d'erreur améliorée
+      const errorMessage = error?.message || error?.error_description || 'Erreur lors de la réinitialisation'
+      const errorDetails = {
+        message: errorMessage,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        timestamp: new Date().toISOString()
+      }
+      
+      logger.error('Erreur réinitialisation', errorDetails)
+      
+      // Message d'erreur plus clair pour l'utilisateur
+      if (error?.code === 'P0001' || errorMessage.includes('permission')) {
+        toast.error('Vous n\'avez pas les permissions nécessaires pour effectuer cette action.')
+      } else if (error?.code === '42883' || errorMessage.includes('does not exist')) {
+        toast.error('La fonction de réinitialisation n\'est pas disponible. Contactez un administrateur système.')
+      } else {
+        toast.error(`Erreur : ${errorMessage}`)
+      }
     } finally {
       setIsResetting(false)
     }
