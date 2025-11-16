@@ -17,9 +17,18 @@ export default defineConfig({
           'excel-vendor': ['xlsx'],
           'supabase-vendor': ['@supabase/supabase-js'],
         },
+        // Améliorer la génération de noms de chunks pour éviter les conflits
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
       },
     },
     chunkSizeWarningLimit: 1000, // Augmenter la limite pour éviter trop d'avertissements
+    // Améliorer le traitement des erreurs de build
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
   },
   plugins: [
     react(),

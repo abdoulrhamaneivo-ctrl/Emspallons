@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
-import { Bell, Settings, Send, Users, Filter } from 'lucide-react'
+import { Bell, Settings, Send } from 'lucide-react'
 import AnimatedCard from '../components/ui/AnimatedCard'
 import AnimatedButton from '../components/ui/AnimatedButton'
 import PageTransition from '../components/ui/PageTransition'
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import ReminderConfigModal from '../components/reminders/ReminderConfigModal'
 import ManualReminders from '../components/reminders/ManualReminders'
+import logger from '../lib/logger'
 
 export default function Rappels() {
   const { isAdmin, role } = useAuth()
@@ -34,8 +35,8 @@ export default function Rappels() {
       if (error) throw error
       setRemindersConfig(data || [])
     } catch (error) {
+      logger.error('Erreur lors du chargement des rappels', error)
       toast.error('Erreur lors du chargement des rappels')
-      console.error(error)
     } finally {
       setLoading(false)
     }
@@ -56,8 +57,8 @@ export default function Rappels() {
       
       toast.success(`Rappel ${!currentActive ? 'activé' : 'désactivé'}`)
     } catch (error) {
+      logger.error('Erreur lors de la modification', error)
       toast.error('Erreur lors de la modification')
-      console.error(error)
     }
   }
 
