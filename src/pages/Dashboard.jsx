@@ -21,6 +21,35 @@ import { fr } from 'date-fns/locale'
 import { formatDate } from '../lib/utils'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
+// Précharger les pages critiques pour éviter les pages blanches
+let StudentsPreloaded = false
+let PaymentsPreloaded = false
+
+const preloadStudents = () => {
+  if (StudentsPreloaded) return
+  StudentsPreloaded = true
+  import('./Students').catch(() => {
+    StudentsPreloaded = false
+  })
+}
+
+const preloadPayments = () => {
+  if (PaymentsPreloaded) return
+  PaymentsPreloaded = true
+  import('./Payments').catch(() => {
+    PaymentsPreloaded = false
+  })
+}
+
+// Précharger immédiatement au chargement du Dashboard
+if (typeof window !== 'undefined') {
+  // Précharger après un court délai pour ne pas bloquer le rendu initial
+  setTimeout(() => {
+    preloadStudents()
+    preloadPayments()
+  }, 500)
+}
+
 export default function Dashboard() {
   const { user, role } = useAuth()
   const navigate = useNavigate()
@@ -95,6 +124,8 @@ export default function Dashboard() {
   const handleQuickAction = (action) => {
     switch (action) {
       case 'add-student':
+        // Précharger avant la navigation pour éviter page blanche
+        preloadStudents()
         // Utiliser sessionStorage comme fallback
         sessionStorage.setItem('openStudentForm', 'true')
         // Utiliser startTransition pour les lazy-loaded components (React 18)
@@ -107,6 +138,8 @@ export default function Dashboard() {
         }, 200)
         break
       case 'add-payment':
+        // Précharger avant la navigation pour éviter page blanche
+        preloadPayments()
         // Utiliser sessionStorage comme fallback
         sessionStorage.setItem('openPaymentForm', 'true')
         // Utiliser startTransition pour les lazy-loaded components (React 18)
@@ -349,6 +382,7 @@ export default function Dashboard() {
                     variant="primary" 
                     className="text-left p-4 h-full"
                     onClick={() => handleQuickAction('add-student')}
+                    onMouseEnter={preloadStudents}
                   >
                     Ajouter un étudiant
                   </AnimatedButton>
@@ -356,6 +390,7 @@ export default function Dashboard() {
                     variant="secondary" 
                     className="text-left p-4 h-full"
                     onClick={() => handleQuickAction('add-payment')}
+                    onMouseEnter={preloadPayments}
                   >
                     Enregistrer un paiement
                   </AnimatedButton>
