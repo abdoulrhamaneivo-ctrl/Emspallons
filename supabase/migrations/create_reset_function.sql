@@ -22,50 +22,51 @@ BEGIN
   END IF;
 
   -- Supprimer dans l'ordre (respect des contraintes de clés étrangères)
+  -- Note: Utiliser WHERE 1=1 pour éviter l'erreur "DELETE requires a WHERE clause" avec RLS
   
-  -- 1. Logs de scan
-  DELETE FROM scan_logs;
+  -- 1. Logs de scan (si la table existe)
+  DELETE FROM scan_logs WHERE 1=1;
   
   -- 2. Historique activités (garder les admins)
   DELETE FROM activity_logs WHERE user_id NOT IN (
     SELECT id FROM profiles WHERE role = 'admin'
-  );
+  ) AND 1=1;
   
   -- 3. Paiements
-  DELETE FROM payments;
+  DELETE FROM payments WHERE 1=1;
   
   -- 4. Étudiants
-  DELETE FROM students;
+  DELETE FROM students WHERE 1=1;
   
   -- 5. Contrôleurs
-  DELETE FROM controllers;
+  DELETE FROM controllers WHERE 1=1;
   
-  -- 6. Classes et niveaux
-  DELETE FROM classes;
-  DELETE FROM niveaux;
+  -- 6. Classes et niveaux (si les tables existent)
+  DELETE FROM classes WHERE 1=1;
+  DELETE FROM niveaux WHERE 1=1;
   
   -- 7. Lignes (sauf les 3 par défaut - vérifier les noms exacts)
   DELETE FROM lines WHERE nom NOT IN ('Yopougon', 'Angré / Bingerville', 'Abobo', 'Angré/Bingerville');
   
-  -- 8. Historique prix
-  DELETE FROM price_history;
+  -- 8. Historique prix (si la table existe)
+  DELETE FROM price_history WHERE 1=1;
   
-  -- 9. Historique rappels
-  DELETE FROM reminders_history;
+  -- 9. Historique rappels (si la table existe)
+  DELETE FROM reminders_history WHERE 1=1;
   
   -- 10. Configuration rappels (reset aux valeurs par défaut)
-  DELETE FROM reminders_config;
+  DELETE FROM reminders_config WHERE 1=1;
   
   -- 11. Présence utilisateurs (sauf admins)
   DELETE FROM user_presence WHERE user_id NOT IN (
     SELECT id FROM profiles WHERE role = 'admin'
-  );
+  ) AND 1=1;
   
-  -- 12. Verrous d'édition
-  DELETE FROM editing_locks;
+  -- 12. Verrous d'édition (si la table existe)
+  DELETE FROM editing_locks WHERE 1=1;
   
   -- 13. Éducateurs (garder les admins)
-  DELETE FROM profiles WHERE role != 'admin';
+  DELETE FROM profiles WHERE role != 'admin' AND 1=1;
   
   -- Recréer les lignes par défaut si supprimées (avec vérification d'existence)
   INSERT INTO lines (nom, couleur, active)
@@ -84,11 +85,22 @@ BEGIN
   );
   
   -- Reset les paramètres globaux (si la table settings existe)
-  UPDATE settings SET
-    paused_months = '[]'::jsonb,
-    default_monthly_fee = 12500,
-    updated_at = NOW()
-  WHERE id = 'global';
+  -- Vérifier d'abord si l'enregistrement existe, sinon le créer
+  IF EXISTS (SELECT 1 FROM settings WHERE id = 'global') THEN
+    UPDATE settings SET
+      paused_months = '[]'::jsonb,
+      default_monthly_fee = 12500,
+      updated_at = NOW()
+    WHERE id = 'global';
+  ELSE
+    -- Si aucun enregistrement n'existe, en créer un par défaut
+    INSERT INTO settings (id, paused_months, default_monthly_fee, created_at, updated_at)
+    VALUES ('global', '[]'::jsonb, 12500, NOW(), NOW())
+    ON CONFLICT (id) DO UPDATE SET
+      paused_months = '[]'::jsonb,
+      default_monthly_fee = 12500,
+      updated_at = NOW();
+  END IF;
   
   -- Construire le résumé (après suppression)
   deleted_counts := json_build_object(

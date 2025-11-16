@@ -83,20 +83,35 @@ export default function ResetDatabaseModal({ isOpen, onClose }) {
       const { data, error } = await supabase.rpc('reset_database_except_admins')
       
       if (error) {
-        logger.error('Erreur réinitialisation', { 
-          error: error.message || error,
+        // Log détaillé de l'erreur
+        const errorDetails = {
+          message: error.message || error.toString(),
           code: error.code,
           details: error.details,
-          hint: error.hint
-        })
+          hint: error.hint,
+          timestamp: new Date().toISOString()
+        }
+        
+        logger.error('Erreur réinitialisation', errorDetails)
         
         // Vérifier si c'est une erreur de permission ou de fonction non trouvée
-        if (error.code === '42883' || error.message?.includes('does not exist')) {
-          toast.error('La fonction de réinitialisation n\'est pas disponible. Contactez un administrateur système.')
+        if (error.code === '42883' || error.message?.includes('does not exist') || error.message?.includes('function')) {
+          toast.error('La fonction de réinitialisation n\'est pas disponible. Vérifiez que la migration a été appliquée.')
+          setIsResetting(false)
           return
         }
         
-        throw error
+        // Vérifier si c'est une erreur "DELETE requires a WHERE clause"
+        if (error.message?.includes('WHERE clause') || error.code === 'P0001') {
+          toast.error('Erreur de sécurité : La fonction nécessite une mise à jour. Contactez un administrateur système.')
+          setIsResetting(false)
+          return
+        }
+        
+        // Afficher le message d'erreur complet
+        toast.error(`Erreur : ${error.message || 'Erreur inconnue lors de la réinitialisation'}`)
+        setIsResetting(false)
+        return
       }
       
       logger.info('Réinitialisation terminée', { 
