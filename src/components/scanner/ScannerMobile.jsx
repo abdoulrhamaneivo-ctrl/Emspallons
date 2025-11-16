@@ -134,22 +134,21 @@ export default function ScannerMobile({ children }) {
             
             // Utiliser startTransition pour navigation fluide
             startTransition(() => {
-              // Essayer d'abord de retourner en arrière dans l'historique
-              if (window.history.length > 1 && document.referrer) {
-                // Retourner en arrière
-                window.history.back()
-                
-                // Fallback: si on est toujours sur la même page après 300ms, forcer la navigation
-                setTimeout(() => {
-                  if (window.location.pathname === '/scan' || window.location.pathname.startsWith('/scan')) {
-                    // Aller à la page d'accueil ou de login
-                    navigate('/login', { replace: true })
-                  }
-                }, 300)
-              } else {
-                // Pas d'historique, aller à la page de login
-                navigate('/login', { replace: true })
-              }
+              // Nettoyer la session d'abord
+              sessionStorage.removeItem('controller_session')
+              
+              // Essayer de retourner en arrière avec React Router
+              // Si pas d'historique, aller à la page de login
+              navigate(-1)
+              
+              // Fallback: si on est toujours sur la même page après 500ms, forcer la navigation
+              setTimeout(() => {
+                const currentPath = window.location.pathname
+                if (currentPath === '/scan' || currentPath.startsWith('/scan')) {
+                  // Aller à la page de login
+                  navigate('/login', { replace: true })
+                }
+              }, 500)
             })
           }}
           className="scanner-button bg-red-600 hover:bg-red-700 active:bg-red-800 text-white flex items-center justify-center gap-2 touch-manipulation"
