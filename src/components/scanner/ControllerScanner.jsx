@@ -31,17 +31,46 @@ export default function ControllerScanner() {
 
   // Vérifier si un contrôleur est déjà connecté
   useEffect(() => {
-    const stored = sessionStorage.getItem('controller_session')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        if (parsed.controller_session) {
-          setController(parsed.controller_session)
+    const loadSession = () => {
+      const stored = sessionStorage.getItem('controller_session')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          if (parsed.controller_session) {
+            setController(parsed.controller_session)
+            return
+          }
+        } catch (e) {
+          logger.error('Error parsing controller session', e)
         }
-      } catch (e) {
-        logger.error('Error parsing controller session', e)
-        sessionStorage.removeItem('controller_session')
       }
+      setController(null)
+    }
+
+    loadSession()
+
+    const handleStorage = (event) => {
+      if (event.key === 'controller_session') {
+        loadSession()
+      }
+    }
+
+    const handleCustomEvent = (event) => {
+      if (event?.detail?.controller) {
+        setController(event.detail.controller)
+      } else if (event?.detail?.controller === null) {
+        setController(null)
+      } else {
+        loadSession()
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+    window.addEventListener('controller-session-changed', handleCustomEvent)
+
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('controller-session-changed', handleCustomEvent)
     }
   }, [])
 
@@ -62,7 +91,7 @@ export default function ControllerScanner() {
 
   const handleLogout = () => {
     sessionStorage.removeItem('controller_session')
-    window.dispatchEvent(new Event('controller-session-changed'))
+    window.dispatchEvent(new CustomEvent('controller-session-changed', { detail: { controller: null } }))
     setController(null)
     stopScanning()
     toast.success('Déconnexion réussie')
@@ -151,6 +180,7 @@ export default function ControllerScanner() {
 
       // 2. VÉRIFICATION DOUBLONS (PRIORITÉ)
       // Vérifier si ce même étudiant a été scanné par ce contrôleur dans la dernière heure
+      // IMPORTANT : Chercher le PREMIER scan (plus ancien) pour afficher l'heure du premier scan
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
       const { data: recentScans, error: recentScansError } = await supabase
         .from('scan_logs')
@@ -158,7 +188,7 @@ export default function ControllerScanner() {
         .eq('student_id', student.id)
         .eq('controller_id', controller.id)
         .gte('scanned_at', oneHourAgo)
-        .order('scanned_at', { ascending: false })
+        .order('scanned_at', { ascending: true }) // Ordre ascendant pour avoir le premier scan
         .limit(1)
 
       if (recentScansError) {
@@ -167,14 +197,20 @@ export default function ControllerScanner() {
       }
 
       if (recentScans && recentScans.length > 0) {
-        const lastScan = new Date(recentScans[0].scanned_at)
-        const minutesAgo = Math.floor((Date.now() - lastScan.getTime()) / 60000)
+        const firstScan = new Date(recentScans[0].scanned_at) // Premier scan (le plus ancien)
+        const minutesAgo = Math.floor((Date.now() - firstScan.getTime()) / 60000)
         const nextScanIn = 60 - minutesAgo
+        
+        // Formater l'heure du premier scan
+        const firstScanTime = new Intl.DateTimeFormat('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }).format(firstScan)
 
         setScanResult({
           success: false,
           statut: STATUTS_SCAN.DUPLICATE,
-          message: `🚫 Déjà scanné il y a ${minutesAgo} min. Prochain scan dans ${nextScanIn} min.`,
+          message: `🚫 Déjà scanné à ${firstScanTime} (il y a ${minutesAgo} min). Prochain scan dans ${nextScanIn} min.`,
           student,
           bgColor: 'bg-orange-500',
         })
@@ -471,37 +507,41 @@ export default function ControllerScanner() {
     setScanning(false)
   }, [])
 
-  // Fonction de réinitialisation des scans d'aujourd'hui
+  // Fonction de réinitialisation des scans - Supprime les scans de la dernière heure
+  // Permet de rescanner les étudiants sans avoir de doublons
+  // Utile quand un contrôleur et un étudiant discutent et veulent reprendre le scan
   const resetTodayScans = async () => {
     if (!controller?.id) {
       toast.error('Contrôleur non connecté')
       return
     }
 
-    if (!confirm('Réinitialiser les scans d\'aujourd\'hui ? Les doublons seront effacés.')) {
+    if (!confirm('Réinitialiser les scans de la dernière heure ?\n\nLes scans effectués dans la dernière heure seront supprimés, permettant de rescanner les étudiants sans doublons.')) {
       return
     }
 
     try {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      // Supprimer les scans de la dernière heure pour ce contrôleur
+      // Cela permet de rescanner les étudiants sans avoir de message de doublon
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-      // Supprimer les scans du jour pour ce contrôleur
       const { error } = await supabase
         .from('scan_logs')
         .delete()
         .eq('controller_id', controller.id)
-        .gte('scanned_at', today.toISOString())
+        .gte('scanned_at', oneHourAgo)
 
       if (error) {
         logger.error('Erreur réinitialisation scans', error)
         throw error
       }
 
-      toast.success('Scans d\'aujourd\'hui réinitialisés')
-      logger.info('Réinitialisation scans contrôleur', {
+      toast.success('Scans de la dernière heure réinitialisés. Vous pouvez maintenant rescanner les étudiants.')
+      
+      logger.info('Réinitialisation scans contrôleur (dernière heure)', {
         controller_id: controller.id,
-        date: today
+        one_hour_ago: oneHourAgo,
+        timestamp: new Date().toISOString()
       })
 
     } catch (error) {

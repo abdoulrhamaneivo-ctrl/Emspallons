@@ -144,7 +144,7 @@ export const parseExcelFile = async (file) => {
  * Mappe les données importées vers le format étudiants
  */
 export const mapImportedDataToStudents = (data, lines) => {
-  return data.map((row, index) => {
+  return data.map((row) => {
     // Mapping flexible des colonnes
     const nom = row.Nom || row.nom || row['Nom'] || ''
     const prenom = row.Prénom || row.prenom || row['Prénom'] || ''
@@ -154,6 +154,7 @@ export const mapImportedDataToStudents = (data, lines) => {
     const pointRamassage = row['Point de ramassage'] || row.point_ramassage || row['Point de ramassage'] || ''
     const niveau = row.Niveau || row.niveau || row['Niveau'] || ''
     const classe = row.Classe || row.classe || row['Classe'] || ''
+    const qrToken = row['QR Token'] || row.qr_code_token || row.qrToken || ''
     
     // Trouver la ligne par nom
     const ligne = lines.find(l => l.nom === ligneNom)
@@ -167,6 +168,7 @@ export const mapImportedDataToStudents = (data, lines) => {
       point_ramassage: pointRamassage,
       niveau,
       classe,
+      qr_code_token: qrToken || undefined,
     }
   }).filter(student => student.nom && student.contact) // Filtrer les lignes vides
 }

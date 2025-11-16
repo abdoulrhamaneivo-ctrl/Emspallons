@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Upload, Download, FileText, X } from 'lucide-react'
+import { Upload, Download, FileText } from 'lucide-react'
 import AnimatedModal from '../ui/AnimatedModal'
 import AnimatedButton from '../ui/AnimatedButton'
 import { exportStudentsToJSON, exportStudentsToCSV, exportStudentsToExcel, parseJSONFile, parseCSVFile, parseExcelFile, mapImportedDataToStudents } from '../../lib/exportUtils'
-import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { useStudents } from '../../hooks/useStudents'
 import { useAuth } from '../../context/AuthContext'
@@ -60,6 +59,12 @@ export default function ImportExportModal({ isOpen, onClose, students, lines, on
         }
 
         const studentsToImport = mapImportedDataToStudents(data, lines)
+        const missingLine = studentsToImport.filter(student => !student.ligne_id)
+        if (missingLine.length > 0) {
+          toast.error('Certaines lignes n\'ont pas de ligne de car correspondante. Vérifiez le mapping avant de continuer.')
+          setImporting(false)
+          return
+        }
         
         // Créer les étudiants
         let successCount = 0
@@ -72,10 +77,10 @@ export default function ImportExportModal({ isOpen, onClose, students, lines, on
             
             const result = await createStudent({
               ...studentData,
-              qr_code_token: qrToken,
+              qr_code_token: studentData.qr_code_token || qrToken,
               qr_code_status: 'active',
               created_by: user?.id,
-            })
+            }, { silent: true })
 
             if (!result.error) {
               successCount++

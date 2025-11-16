@@ -94,6 +94,12 @@ export default function BottomNav() {
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
               showMoreMenu ? 'text-emsp-yellow' : 'text-gray-600'
             }`}
+            style={{
+              minWidth: '44px',
+              minHeight: '44px',
+              pointerEvents: 'auto',
+              touchAction: 'manipulation'
+            }}
           >
             <MoreVertical size={24} />
             <span className="text-xs mt-1 font-medium">Plus</span>

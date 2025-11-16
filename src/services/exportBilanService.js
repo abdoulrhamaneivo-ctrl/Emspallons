@@ -54,13 +54,50 @@ export const getFutureSessions = (monthsLedger) => {
 
 /**
  * Génère un bilan mensuel
+ * Exclut automatiquement les mois hors service des bilans
  */
 export const generateBilanMensuel = async (month, ligneId = null) => {
   try {
     // Formater le mois (YYYY-MM)
     const monthStr = format(parseISO(month), 'yyyy-MM')
     
-    // Construire la requête
+    // Récupérer les mois hors service depuis settings
+    let pausedMonths = []
+    try {
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('paused_months')
+        .limit(1)
+        .single()
+      
+      if (settings?.paused_months) {
+        pausedMonths = settings.paused_months
+      }
+    } catch (error) {
+      logger.debug('Erreur récupération paused_months pour bilan', error)
+      // Continuer même si on ne peut pas récupérer les mois hors service
+    }
+    
+    // Vérifier si le mois sélectionné est un mois hors service
+    if (pausedMonths.includes(monthStr)) {
+      logger.info('Mois sélectionné est hors service', { month: monthStr })
+      // Retourner un bilan vide pour les mois hors service
+      return {
+        month: monthStr,
+        students: [],
+        payments: [],
+        stats: {
+          totalStudents: 0,
+          totalPayments: 0,
+          totalEncaisse: 0,
+          montantMoyen: 0,
+        },
+        pausedMonth: true
+      }
+    }
+    
+    // CHANGEMENT IMPORTANT : Charger TOUS les étudiants, pas seulement ceux qui ont payé pour ce mois
+    // Le bilan mensuel doit afficher tous les étudiants avec leur statut pour le mois sélectionné
     let query = supabase
       .from('students')
       .select(`
@@ -134,42 +171,64 @@ export const generateBilanMensuel = async (month, ligneId = null) => {
     }
     
     // Traiter chaque étudiant avec les données préchargées
+    // Inclure TOUS les étudiants, pas seulement ceux qui ont payé pour ce mois
     const studentsWithPayments = (students || []).map((student) => {
       const lastPayment = lastPaymentsMap.get(student.id) || null
       const totalPaye = paymentsMap.get(student.id) || 0
       
-      // Vérifier si le mois est dans months_ledger
-      const isMonthPaid = student.months_ledger?.includes(monthStr) || false
-      const futureSessions = getFutureSessions(student.months_ledger || [])
-      const isAnticipated = futureSessions.length > 0
+      // Filtrer les sessions pour exclure les mois hors service
+      const allSessions = student.months_ledger || []
+      const validSessions = allSessions.filter(session => !pausedMonths.includes(session))
       
-      // Statut au mois X
-      let statutMoisX = 'EXPIRÉ'
-      if (isMonthPaid) {
+      // Calculer le statut pour le mois sélectionné (comme dans BilanMensuel.jsx)
+      let statutMoisX = 'EXPIRE'
+      
+      if (pausedMonths.includes(monthStr)) {
+        // Si le mois est hors service, tous les étudiants sont hors service
+        statutMoisX = 'HORS_SERVICE'
+      } else if (validSessions.includes(monthStr)) {
+        // Si le mois est dans les sessions valides, l'étudiant est actif
         statutMoisX = 'ACTIF'
-      } else if (isAnticipated && futureSessions.includes(monthStr)) {
-        statutMoisX = 'ACTIF (Anticipé)'
-      } else {
-        // Vérifier si en retard
-        const currentMonth = format(startOfMonth(new Date()), 'yyyy-MM')
-        if (monthStr <= currentMonth) {
-          statutMoisX = student.statut_paiement || 'EXPIRÉ'
+      } else if (validSessions.length > 0) {
+        // Vérifier si l'étudiant est en retard ou expiré
+        const lastValidMonth = validSessions.sort().pop()
+        if (lastValidMonth && lastValidMonth < monthStr) {
+          // Calculer si on est dans la période de grâce (5 jours après le dernier mois payé)
+          const [year, month] = lastValidMonth.split('-').map(Number)
+          const lastPaidDate = new Date(year, month, 1)
+          const nextMonthDate = new Date(year, month + 1, 1)
+          const graceEndDate = new Date(nextMonthDate)
+          graceEndDate.setDate(graceEndDate.getDate() + 5)
+          
+          const selectedDate = new Date(monthStr + '-01')
+          if (selectedDate <= graceEndDate) {
+            statutMoisX = 'EN_RETARD'
+          } else {
+            statutMoisX = 'EXPIRE'
+          }
+        } else {
+          statutMoisX = 'EXPIRE'
         }
       }
       
       // Mois couverts (première session à dernière session) - Format français
-      const sessions = student.months_ledger || []
+      // Utiliser uniquement les sessions valides (hors service exclus)
       let moisCouverts = 'Aucun'
-      if (sessions.length > 0) {
+      if (validSessions.length > 0) {
         try {
-          const firstMonth = format(parseISO(sessions[0] + '-01'), 'MMMM yyyy', { locale: fr })
-          const lastMonth = format(parseISO(sessions[sessions.length - 1] + '-01'), 'MMMM yyyy', { locale: fr })
+          const firstMonth = format(parseISO(validSessions[0] + '-01'), 'MMMM yyyy', { locale: fr })
+          const lastMonth = format(parseISO(validSessions[validSessions.length - 1] + '-01'), 'MMMM yyyy', { locale: fr })
           moisCouverts = `${firstMonth} à ${lastMonth}`
         } catch {
           // Fallback si erreur de parsing
-          moisCouverts = `${sessions[0]} à ${sessions[sessions.length - 1]}`
+          moisCouverts = `${validSessions[0]} à ${validSessions[validSessions.length - 1]}`
         }
       }
+      
+      // Calculer les sessions futures et si le paiement est anticipé
+      const currentMonth = format(startOfMonth(new Date()), 'yyyy-MM')
+      const futureSessions = validSessions.filter(session => session > currentMonth)
+      const isAnticipated = futureSessions.length > 0
       
       return {
         numero_etudiant: student.id.substring(0, 8).toUpperCase(),
@@ -201,18 +260,31 @@ export const generateBilanMensuel = async (month, ligneId = null) => {
     
     // Calculer le montant encaissé pour le mois en question
     // Répartir les paiements multi-mois dans leurs mois respectifs
+    // IMPORTANT : Exclure les mois hors service du calcul
     let totalEncaisseMois = 0
     
+    // Filtrer les sessions pour exclure les mois hors service
+    const filterValidSessions = (sessions) => {
+      return (sessions || []).filter(session => !pausedMonths.includes(session))
+    }
+    
     // Utiliser les paiements déjà récupérés (allPaymentsData)
-    // Pour chaque paiement, répartir le montant selon les mois payés
+    // Pour chaque paiement, répartir le montant selon les mois payés (uniquement les mois valides)
     allPaymentsData.forEach(payment => {
-      const sessions = payment.sessions || []
-      if (sessions.length === 0 || !payment.montant_total) return
+      const allSessions = payment.sessions || []
+      if (allSessions.length === 0 || !payment.montant_total) return
       
-      // Vérifier si ce paiement inclut le mois recherché
-      if (sessions.includes(monthStr)) {
-        // Calculer le montant mensuel (montant total divisé par nombre de mois)
-        const montantMensuel = payment.montant_total / sessions.length
+      // Filtrer pour ne garder que les mois valides (non hors service)
+      const validSessions = filterValidSessions(allSessions)
+      
+      // Si aucun mois valide, ignorer ce paiement
+      if (validSessions.length === 0) return
+      
+      // Vérifier si ce paiement inclut le mois recherché (dans les mois valides)
+      if (validSessions.includes(monthStr)) {
+        // Calculer le montant mensuel basé sur les mois VALIDES uniquement
+        // Le montant total est réparti uniquement sur les mois où le service est actif
+        const montantMensuel = payment.montant_total / validSessions.length
         // Ajouter seulement la part correspondant au mois recherché
         totalEncaisseMois += montantMensuel
       }

@@ -359,17 +359,31 @@ export default function ManualReminders() {
 
         await Promise.all(batch.map(async (student) => {
           try {
-            // Remplacer les variables dans le message
-            const personalizedMessage = message
-              .replace(/{nom}/g, student.nom || '')
-              .replace(/{prenom}/g, student.prenom || '')
-              .replace(/{classe}/g, student.classe?.nom || student.classe || '')
-              .replace(/{ligne}/g, student.lines?.nom || '')
-              .replace(/{date_expiration}/g, (() => {
-                const lastPayment = student.months_ledger?.[student.months_ledger.length - 1]
-                return lastPayment ? format(new Date(lastPayment + '-01'), 'dd/MM/yyyy') : 'N/A'
-              })())
-              .replace(/{montant}/g, '12 500 FCFA')
+            // Calculer date expiration
+            const lastPayment = student.months_ledger?.[student.months_ledger.length - 1]
+            const expirationDate = lastPayment ? format(new Date(lastPayment + '-01'), 'dd/MM/yyyy') : 'N/A'
+            const daysRemaining = lastPayment ? differenceInDays(new Date(lastPayment + '-01'), new Date()) : 0
+            
+            // Calculer montant avec le prix dynamique
+            const priceInfo = await calculatePrice({
+              niveau: student.niveau || null,
+              ligne_id: student.ligne_id || null,
+            })
+            
+            // Préparer les données pour le remplacement des variables
+            const studentData = {
+              tuteur: student.tuteur || 'Parent',
+              nom_etudiant: student.nom || '',
+              prenom_etudiant: student.prenom || '',
+              classe: student.classe || '',
+              ligne: student.lines?.nom || '',
+              date_expiration: expirationDate,
+              montant: `${priceInfo.price.toLocaleString('fr-FR')} FCFA`,
+              jours_restants: daysRemaining.toString(),
+            }
+            
+            // Remplacer les variables dans le message avec la fonction appropriée
+            const personalizedMessage = replaceTemplateVariables(message, studentData)
 
             // Envoyer via WhatsApp
             await sendWhatsAppMessage(student.contact, personalizedMessage)

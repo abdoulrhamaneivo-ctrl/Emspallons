@@ -4,8 +4,11 @@ import logger from '../lib/logger'
 import toast from 'react-hot-toast'
 import { Calendar, Plus, X, AlertCircle } from 'lucide-react'
 import { Button, Card } from '../components/ui'
+import Layout from '../components/Layout'
+import { useAuth } from '../context/AuthContext'
 
 export default function AdminPausedMonths() {
+  const { isAdmin } = useAuth()
   const [pausedMonths, setPausedMonths] = useState([])
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
@@ -23,13 +26,28 @@ export default function AdminPausedMonths() {
 
   const loadPausedMonths = async () => {
     try {
+      // Récupérer le premier enregistrement settings (car id est UUID, pas 'global')
       const { data, error } = await supabase
         .from('settings')
-        .select('paused_months')
-        .eq('id', 'global')
+        .select('paused_months, id')
+        .limit(1)
         .single()
 
-      if (error && error.code !== 'PGRST116') throw error
+      if (error && error.code !== 'PGRST116') {
+        // Si aucun enregistrement n'existe, créer un par défaut
+        if (error.code === 'PGRST116') {
+          const { error: insertError } = await supabase
+            .from('settings')
+            .insert({ paused_months: [] })
+            .select()
+            .single()
+          
+          if (insertError) throw insertError
+          setPausedMonths([])
+          return
+        }
+        throw error
+      }
 
       setPausedMonths(data?.paused_months || [])
     } catch (error) {
@@ -52,41 +70,81 @@ export default function AdminPausedMonths() {
     try {
       const updated = [...pausedMonths, monthId].sort()
 
-      // Vérifier si settings existe
-      const { data: existing } = await supabase
+      // Récupérer le premier enregistrement settings
+      const { data: existing, error: fetchError } = await supabase
         .from('settings')
         .select('id')
-        .eq('id', 'global')
+        .limit(1)
         .single()
 
-      if (existing) {
-        const { error } = await supabase
+      if (fetchError && fetchError.code === 'PGRST116') {
+        // Créer un nouvel enregistrement si aucun n'existe
+        const { error: insertError } = await supabase
+          .from('settings')
+          .insert({ paused_months: updated })
+          .select()
+          .single()
+        
+        if (insertError) throw insertError
+      } else if (existing) {
+        // Mettre à jour l'enregistrement existant
+        const { error: updateError } = await supabase
           .from('settings')
           .update({ paused_months: updated })
-          .eq('id', 'global')
+          .eq('id', existing.id)
         
-        if (error) throw error
+        if (updateError) throw updateError
       } else {
-        const { error } = await supabase
-          .from('settings')
-          .insert({ id: 'global', paused_months: updated })
-        
-        if (error) throw error
+        throw new Error('Impossible de récupérer ou créer les paramètres')
       }
 
+      // Appeler la fonction SQL pour mettre à jour automatiquement les abonnements
+      // Cette fonction retire le mois hors service des months_ledger et sessions
+      // et recalcule automatiquement les montants des paiements
+      const { data: shiftResult, error: shiftError } = await supabase.rpc('shift_subscriptions_for_paused_month', {
+        paused_month: monthId
+      })
+
+      if (shiftError) {
+        logger.warn('Erreur lors du décalage des abonnements (non bloquant)', shiftError)
+        // Continuer même si le décalage échoue
+      } else if (shiftResult) {
+        logger.info('Abonnements décalés avec succès', {
+          paused_month: monthId,
+          affected_students: shiftResult.affected_students || 0,
+          affected_payments: shiftResult.affected_payments || 0
+        })
+      }
+
+      const affectedStudents = shiftResult?.affected_students || 0
+      const affectedPayments = shiftResult?.affected_payments || 0
+      
       setPausedMonths(updated)
-      toast.success(`${months[selectedMonth - 1]} ${selectedYear} ajouté hors service`)
+      
+      let successMessage = `${months[selectedMonth - 1]} ${selectedYear} ajouté hors service.`
+      if (affectedStudents > 0 || affectedPayments > 0) {
+        successMessage += ` ${affectedStudents} étudiant(s) et ${affectedPayments} paiement(s) mis à jour.`
+      }
+      toast.success(successMessage, { duration: 5000 })
 
       // Log dans activity_logs
-      await supabase.from('activity_logs').insert({
-        action_type: 'PAUSED_MONTH_ADD',
-        entity_type: 'SETTINGS',
-        details: { month: monthId }
-      })
+      try {
+        const { data: currentUser } = await supabase.auth.getUser()
+        if (currentUser?.user?.id) {
+          await supabase.from('activity_logs').insert({
+            action: 'PAUSED_MONTH_ADD',
+            entity_type: 'SETTINGS',
+            user_id: currentUser.user.id,
+            details: { month: monthId, timestamp: new Date().toISOString() }
+          }).catch(err => logger.debug('Erreur log activity', err))
+        }
+      } catch (logErr) {
+        logger.debug('Erreur log activity', logErr)
+      }
 
     } catch (error) {
       logger.error('Erreur ajout mois hors service', error)
-      toast.error('Erreur lors de l\'ajout')
+      toast.error('Erreur lors de l\'ajout: ' + (error.message || 'Erreur inconnue'))
     } finally {
       setLoading(false)
     }
@@ -99,33 +157,63 @@ export default function AdminPausedMonths() {
     try {
       const updated = pausedMonths.filter(m => m !== monthId)
 
+      // Récupérer le premier enregistrement settings
+      const { data: existing, error: fetchError } = await supabase
+        .from('settings')
+        .select('id')
+        .limit(1)
+        .single()
+
+      if (fetchError) throw fetchError
+
       const { error } = await supabase
         .from('settings')
         .update({ paused_months: updated })
-        .eq('id', 'global')
+        .eq('id', existing.id)
 
       if (error) throw error
 
       setPausedMonths(updated)
       toast.success('Mois retiré de la liste hors service')
 
-      await supabase.from('activity_logs').insert({
-        action_type: 'PAUSED_MONTH_REMOVE',
-        entity_type: 'SETTINGS',
-        details: { month: monthId }
-      })
+      // Log dans activity_logs
+      try {
+        const { data: currentUser } = await supabase.auth.getUser()
+        if (currentUser?.user?.id) {
+          await supabase.from('activity_logs').insert({
+            action: 'PAUSED_MONTH_REMOVE',
+            entity_type: 'SETTINGS',
+            user_id: currentUser.user.id,
+            details: { month: monthId, timestamp: new Date().toISOString() }
+          }).catch(err => logger.debug('Erreur log activity', err))
+        }
+      } catch (logErr) {
+        logger.debug('Erreur log activity', logErr)
+      }
 
     } catch (error) {
       logger.error('Erreur retrait mois hors service', error)
-      toast.error('Erreur lors du retrait')
+      toast.error('Erreur lors du retrait: ' + (error.message || 'Erreur inconnue'))
     } finally {
       setLoading(false)
     }
   }
 
+  // Protection : Seuls les admins peuvent accéder
+  if (!isAdmin) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <p className="text-red-600">Accès réservé aux administrateurs</p>
+        </div>
+      </Layout>
+    )
+  }
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
+    <Layout>
+      <div className="p-6 max-w-4xl mx-auto">
+        <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
         <Calendar className="w-6 h-6" />
         Gestion des Mois Hors Service
       </h1>
@@ -221,7 +309,8 @@ export default function AdminPausedMonths() {
           </div>
         )}
       </Card>
-    </div>
+      </div>
+    </Layout>
   )
 }
 

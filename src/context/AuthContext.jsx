@@ -27,13 +27,17 @@ export const AuthProvider = ({ children }) => {
     let timeoutId = null
     let sessionLoaded = false
 
-    // Timeout de sécurité pour éviter le blocage (réduit à 1 seconde)
+    // Timeout de sécurité pour éviter le blocage (augmenté à 3 secondes pour laisser le temps au chargement)
     timeoutId = setTimeout(() => {
       if (mounted && !sessionLoaded) {
-        logger.warn('Auth loading timeout - forcing loading to false')
+        logger.warn('Auth loading timeout - forcing loading to false', {
+          hasUser: !!user,
+          hasRole: !!role,
+          hasProfile: !!profile
+        })
         setLoading(false)
       }
-    }, 1000) // 1 seconde max pour une réponse plus rapide
+    }, 3000) // 3 secondes pour laisser le temps au chargement du rôle
 
     // Fonction optimisée pour charger le profil utilisateur (une seule requête)
     const loadUserProfile = async (userId) => {
@@ -65,6 +69,13 @@ export const AuthProvider = ({ children }) => {
             if (mounted) {
               setRole(userRole)
               setProfile(userProfile)
+              // Si le rôle est null mais que l'utilisateur existe, logger un avertissement
+              if (!userRole) {
+                logger.warn('User exists but role is null after loading', {
+                  userId: session.user.id,
+                  email: session.user.email
+                })
+              }
             }
           } else {
             if (mounted) {

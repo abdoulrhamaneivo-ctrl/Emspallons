@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import Layout from '../components/Layout'
-import { Users, Settings, BarChart3, UserCheck, History, Route, DollarSign, AlertTriangle, Trash2 } from 'lucide-react'
+import { Users, Settings, BarChart3, UserCheck, History, Route, DollarSign, AlertTriangle, Trash2, Calendar } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AnimatedCard from '../components/ui/AnimatedCard'
 import PageTransition from '../components/ui/PageTransition'
@@ -69,6 +69,13 @@ export default function Admin() {
         icon: DollarSign,
         color: 'bg-emsp-yellow',
         path: '/parametres/prix',
+      },
+      {
+        title: 'Mois hors service',
+        description: 'Marquer des périodes (vacances) comme hors service',
+        icon: Calendar,
+        color: 'bg-gray-500',
+        path: '/admin/paused-months',
       },
     ] : []),
   ]

@@ -45,6 +45,14 @@ function Button({
       disabled={isDisabled}
       aria-label={ariaLabel || (typeof children === 'string' ? children : undefined)}
       aria-busy={loading}
+      style={{
+        minWidth: '44px',
+        minHeight: '44px',
+        pointerEvents: isDisabled ? 'none' : 'auto',
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'rgba(253, 185, 19, 0.3)',
+        ...props.style
+      }}
       {...props}
     >
       {loading ? (

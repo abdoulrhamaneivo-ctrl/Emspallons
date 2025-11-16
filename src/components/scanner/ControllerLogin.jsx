@@ -24,7 +24,9 @@ export default function ControllerLogin({ onLoginSuccess }) {
       sessionStorage.setItem('controller_session', JSON.stringify({
         controller_session: controllerData,
       }))
-      window.dispatchEvent(new Event('controller-session-changed'))
+      window.dispatchEvent(new CustomEvent('controller-session-changed', {
+        detail: { controller: controllerData }
+      }))
 
       // Afficher le toast et continuer immédiatement
       toast.success('Connexion réussie', { duration: 2000 })

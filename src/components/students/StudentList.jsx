@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useStudents } from '../../hooks/useStudents'
-import { Search, Plus, Edit, DollarSign, QrCode, Trash2, Filter, X, Upload, Download, CreditCard, GraduationCap } from 'lucide-react'
+import { Search, Plus, Edit, DollarSign, QrCode, Trash2, Filter, X, Upload, Download, GraduationCap } from 'lucide-react'
 import { Button, Badge, Card } from '../ui'
 import EmptyState from '../ui/EmptyState'
 import InfoTooltip from '../ui/InfoTooltip'
 import StudentForm from './StudentForm'
 import PaymentModal from '../payments/PaymentModal'
 import QRCodeDisplay from './QRCodeDisplay'
-import StudentCardModal from './StudentCardModal'
 import ImportExportModal from './ImportExportModal'
 import { STATUTS_PAIEMENT } from '../../lib/constants'
 import { getStatusColor, getStatusLabel } from '../../lib/utils'
@@ -32,7 +31,6 @@ export default function StudentList() {
   const [editingStudent, setEditingStudent] = useState(null)
   const [paymentStudent, setPaymentStudent] = useState(null)
   const [qrStudent, setQrStudent] = useState(null)
-  const [cardStudent, setCardStudent] = useState(null)
   const [lines, setLines] = useState([])
   const [showFilters, setShowFilters] = useState(false)
   const [showImportExport, setShowImportExport] = useState(false)
@@ -448,14 +446,6 @@ export default function StudentList() {
                   <span>Payer</span>
                 </button>
                 <button
-                  onClick={() => setCardStudent(student)}
-                  className="flex-1 px-3 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
-                  title="Voir la carte"
-                >
-                  <CreditCard size={16} />
-                  <span>Carte</span>
-                </button>
-                <button
                   onClick={() => setQrStudent(student)}
                   className="flex-1 px-3 py-2 text-sm bg-emsp-green hover:bg-green-800 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
                   title="QR Code"
@@ -507,13 +497,6 @@ export default function StudentList() {
         />
       )}
 
-      {cardStudent && (
-        <StudentCardModal
-          isOpen={!!cardStudent}
-          onClose={() => setCardStudent(null)}
-          student={cardStudent}
-        />
-      )}
 
       <ImportExportModal
         isOpen={showImportExport}

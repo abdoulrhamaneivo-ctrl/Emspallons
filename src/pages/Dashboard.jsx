@@ -15,11 +15,11 @@ import { supabase } from '../lib/supabase'
 import logger from '../lib/logger'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect, startTransition } from 'react'
+import { useState, useEffect, startTransition, useCallback } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { formatDate } from '../lib/utils'
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 // Précharger les pages critiques pour éviter les pages blanches
 let StudentsPreloaded = false
@@ -67,7 +67,7 @@ export default function Dashboard() {
   // Hooks temps réel
   const { students, loading: studentsLoading } = useRealtimeStudents()
   const { payments, loading: paymentsLoading, stats: paymentStats } = useRealtimePayments()
-  const { scans, loading: scansLoading, scanCount } = useRealtimeScans()
+  const { loading: scansLoading, scanCount } = useRealtimeScans()
   useUserPresence() // Active le suivi de présence
   
   const [recentReminders, setRecentReminders] = useState([])
@@ -147,6 +147,8 @@ export default function Dashboard() {
           navigate('/payments')
         })
       } else if (action === 'scan-qr') {
+        sessionStorage.removeItem('controller_session')
+        window.dispatchEvent(new CustomEvent('controller-session-changed', { detail: { controller: null } }))
         await import('./ScanQR')
         await new Promise(resolve => setTimeout(resolve, 150))
         startTransition(() => {
@@ -168,6 +170,8 @@ export default function Dashboard() {
           navigate('/payments')
         })
       } else if (action === 'scan-qr') {
+        sessionStorage.removeItem('controller_session')
+        window.dispatchEvent(new CustomEvent('controller-session-changed', { detail: { controller: null } }))
         startTransition(() => {
           navigate('/scan')
         })
@@ -190,7 +194,7 @@ export default function Dashboard() {
         loadLineData()
       }, 100) // Petit délai pour permettre au Dashboard de s'afficher rapidement
     }
-  }, [role, studentsLoading, paymentsLoading, scansLoading])
+  }, [role, studentsLoading, paymentsLoading, scansLoading, loadPaymentsData, loadLineData])
 
   // Charger les scans par heure (aujourd'hui)
   const loadTodayScans = async () => {
@@ -227,7 +231,7 @@ export default function Dashboard() {
   }
 
   // Charger les données de paiements (7 derniers jours)
-  const loadPaymentsData = () => {
+  const loadPaymentsData = useCallback(() => {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date()
       date.setDate(date.getDate() - (6 - i))
@@ -248,10 +252,10 @@ export default function Dashboard() {
     })
 
     setPaymentsData(data)
-  }
+  }, [payments])
 
   // Charger la répartition par ligne
-  const loadLineData = () => {
+  const loadLineData = useCallback(() => {
     const lineStats = students?.reduce((acc, student) => {
       const lineName = student.lines?.nom || 'Sans ligne'
       const existing = acc.find(item => item.name === lineName)
@@ -264,7 +268,7 @@ export default function Dashboard() {
     }, []) || []
 
     setLineData(lineStats)
-  }
+  }, [students])
 
   const fetchRecentReminders = async () => {
     try {
@@ -485,7 +489,7 @@ export default function Dashboard() {
               {/* Scans par heure (aujourd'hui) */}
               <AnimatedCard delay={0.7} className="p-6">
                 <h2 className="text-xl font-semibold text-emsp-green mb-4">
-                  Scans par heure (aujourd'hui)
+                  Scans par heure (aujourd&apos;hui)
                 </h2>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={scansByHour}>

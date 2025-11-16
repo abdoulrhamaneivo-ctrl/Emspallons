@@ -160,10 +160,10 @@ export const useStudents = () => {
     }
     }, [fetchStudents, handleRealtimeChange, updateStudentsState])
 
-  const createStudent = async (studentData) => {
+  const createStudent = async (studentData, options = {}) => {
+    const { silent = false } = options
     try {
-      // Générer le QR code token
-      const qrToken = genererCodeQR()
+      const qrToken = studentData.qr_code_token || genererCodeQR()
       
       const dataToInsert = {
         ...studentData,
@@ -187,12 +187,15 @@ export const useStudents = () => {
 
       if (createError) throw createError
       
-      // Le trigger mettra à jour automatiquement le statut_paiement
       updateStudentsState((prev) => [data, ...prev])
-      toast.success('Étudiant créé avec succès')
+      if (!silent) {
+        toast.success('Étudiant créé avec succès')
+      }
       return { data, error: null }
     } catch (err) {
-      toast.error(err.message || 'Erreur lors de la création de l\'étudiant')
+      if (!silent) {
+        toast.error(err.message || 'Erreur lors de la création de l\'étudiant')
+      }
       return { data: null, error: err }
     }
   }
@@ -251,7 +254,39 @@ export const useStudents = () => {
       })
       
       if (error) throw error
+      
       toast.success('QR Code régénéré avec succès')
+      
+      // Télécharger automatiquement le nouveau QR code
+      try {
+        // Récupérer les données complètes de l'étudiant
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('*')
+          .eq('id', id)
+          .single()
+
+        if (studentData) {
+          // Mettre à jour le token dans studentData avec le nouveau token
+          studentData.qr_code_token = newToken
+          
+          // Petit délai pour laisser le toast s'afficher
+          setTimeout(async () => {
+            try {
+              const { downloadQRCodeFromToken } = await import('../utils/qrDownload')
+              await downloadQRCodeFromToken(studentData)
+              toast.success('QR Code téléchargé automatiquement')
+            } catch (qrError) {
+              logger.error('Erreur lors du téléchargement automatique du QR code', qrError, { studentId: id })
+              toast.error('QR Code régénéré mais non téléchargé automatiquement')
+            }
+          }, 500)
+        }
+      } catch (downloadError) {
+        logger.error('Erreur lors du téléchargement automatique du QR code', downloadError, { studentId: id })
+        // Ne pas bloquer la régénération si le téléchargement échoue
+      }
+
       return { data, error: null }
     } catch (err) {
       toast.error('Erreur lors de la régénération du QR Code')

@@ -38,16 +38,23 @@ export default function AnimatedModal({
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            style={{ pointerEvents: 'auto' }}
           />
           
           {/* Modal */}
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div 
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{ pointerEvents: 'none' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               className={`bg-white rounded-2xl shadow-2xl ${sizes[size]} w-full max-h-[90vh] overflow-hidden flex flex-col`}
+              style={{ pointerEvents: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
               {title && (
@@ -58,6 +65,12 @@ export default function AnimatedModal({
                   <button
                     onClick={onClose}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    style={{
+                      minWidth: '44px',
+                      minHeight: '44px',
+                      pointerEvents: 'auto',
+                      touchAction: 'manipulation'
+                    }}
                   >
                     <X size={20} className="text-gray-600" />
                   </button>
@@ -65,7 +78,13 @@ export default function AnimatedModal({
               )}
               
               {/* Content */}
-              <div className="p-6 overflow-y-auto flex-1">
+              <div 
+                className="p-6 overflow-y-auto flex-1"
+                style={{ 
+                  pointerEvents: 'auto',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
                 {children}
               </div>
             </motion.div>

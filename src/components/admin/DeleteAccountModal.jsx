@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import logger from '../../lib/logger'
 
 const CONFIRMATION_TEXT = 'SUPPRIMER MON COMPTE'
 
@@ -67,16 +68,24 @@ export default function DeleteAccountModal({ isOpen, onClose }) {
 
       // Logger dans activity_logs
       try {
-        await supabase.from('activity_logs').insert([
-          {
-            user_id: user?.id,
-            action: 'ACCOUNT_DELETE',
-            description: `Compte administrateur supprimé: ${user?.email}`,
-            metadata: { email: user?.email },
-          },
-        ])
+        if (user?.id) {
+          await supabase.from('activity_logs').insert([
+            {
+              action: 'ACCOUNT_DELETE',
+              entity_type: 'USER',
+              user_id: user.id,
+              details: {
+                deleted_user_email: user?.email,
+                deleted_user_nom: user?.nom,
+                timestamp: new Date().toISOString()
+              },
+            },
+          ]).catch((logErr) => {
+            logger.debug('Impossible d\'enregistrer dans activity_logs', logErr)
+          })
+        }
       } catch (logError) {
-        console.warn('Error logging activity:', logError)
+        logger.debug('Erreur lors de l\'enregistrement du log', logError)
       }
 
       // Clear localStorage

@@ -78,8 +78,12 @@ export default function ScannerMobile({ children }) {
   }, [isMobile, refreshControlState])
 
   useEffect(() => {
-    const handleSessionChange = () => {
-      refreshControlState()
+    const handleSessionChange = (event) => {
+      if (event?.detail && 'controller' in event.detail) {
+        setCanShowControls(Boolean(event.detail.controller))
+      } else {
+        refreshControlState()
+      }
     }
     window.addEventListener('controller-session-changed', handleSessionChange)
     return () => {
@@ -89,6 +93,12 @@ export default function ScannerMobile({ children }) {
 
   if (!isMobile) {
     return <>{children}</>
+  }
+
+  if (!canShowControls) {
+    return <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-green-50 to-emsp-green/5">
+      {children}
+    </div>
   }
 
   return (
@@ -144,7 +154,7 @@ export default function ScannerMobile({ children }) {
           <span className="hidden sm:inline">Historique</span>
         </button>
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.preventDefault()
             e.stopPropagation()
             
@@ -158,34 +168,34 @@ export default function ScannerMobile({ children }) {
             window.dispatchEvent(new Event('controller-session-changed'))
             refreshControlState()
             
+            // Précharger Login avant navigation
+            try {
+              await import('../../pages/Login')
+              await new Promise(resolve => setTimeout(resolve, 100))
+            } catch (error) {
+              logger.error('Erreur préchargement Login', error)
+            }
+            
             // Utiliser startTransition pour navigation fluide
             startTransition(() => {
-              // Essayer de retourner en arrière avec React Router
-              navigate(-1)
-              
-              // Fallback: si on est toujours sur la même page après 500ms, forcer la navigation vers login
-              setTimeout(() => {
-                const currentPath = window.location.pathname
-                if (currentPath === '/scan' || currentPath.startsWith('/scan')) {
-                  // Aller à la page de login
-                  navigate('/login', { replace: true })
-                }
-              }, 500)
+              // Forcer la navigation vers login
+              navigate('/login', { replace: true })
             })
           }}
           className="scanner-button bg-red-600 hover:bg-red-700 active:bg-red-800 text-white flex items-center justify-center gap-2 touch-manipulation"
           style={{ 
-            minWidth: '48px', 
-            minHeight: '48px',
+            minWidth: '56px', 
+            minHeight: '56px',
             WebkitTapHighlightColor: 'transparent',
             touchAction: 'manipulation',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            userSelect: 'none'
           }}
           type="button"
           aria-label="Retour en arrière"
         >
           <LogOut size={20} />
-          <span className="hidden sm:inline">Retour</span>
+          <span className="hidden sm:inline font-semibold">Retour</span>
         </button>
       </div>
       )}

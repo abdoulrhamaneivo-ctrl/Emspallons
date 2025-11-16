@@ -129,7 +129,7 @@ export default function ResetDatabaseModal({ isOpen, onClose }) {
           const userId = user.user.id
           if (userId && typeof userId === 'string' && userId.length > 0) {
             await supabase.from('activity_logs').insert({
-              action_type: 'DATABASE_RESET',
+              action: 'DATABASE_RESET',
               entity_type: 'SYSTEM',
               user_id: userId,
               details: {

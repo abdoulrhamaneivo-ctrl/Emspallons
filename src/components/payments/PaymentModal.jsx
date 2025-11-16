@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { X } from 'lucide-react'
-import { Button, Input, Select } from '../ui'
+import { Button, Input } from '../ui'
 import { formatCurrency, formatDate, formatMonthFrench, formatMonthsListFrench } from '../../lib/utils'
 import { PRIX_MENSUEL } from '../../lib/constants'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
-import { format, addMonths, startOfMonth, eachMonthOfInterval, isAfter, parseISO } from 'date-fns'
+import { format, addMonths, startOfMonth, isAfter, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { generateReceiptPDF, downloadReceipt } from '../../services/receiptService'
 import { Info } from 'lucide-react'
@@ -14,6 +14,8 @@ import { calculatePrice } from '../../utils/priceCalculator'
 import InfoTooltip from '../ui/InfoTooltip'
 import logger from '../../lib/logger'
 import { sendPaymentConfirmationWhatsApp } from '../../services/whatsappAutoService'
+
+const WHATSAPP_ENABLED = Boolean(import.meta.env.VITE_WHATSAPP_API_KEY)
 
 export default function PaymentModal({ student, onClose, onSuccess }) {
   const { user } = useAuth()
@@ -64,7 +66,7 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
         const { data: settings } = await supabase
           .from('settings')
           .select('paused_months')
-          .eq('id', 'global')
+          .limit(1)
           .single()
 
         setPausedMonths(settings?.paused_months || [])
@@ -190,11 +192,11 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
       // Le trigger update_months_ledger_on_payment mettra à jour automatiquement
       // le months_ledger de l'étudiant et le statut_paiement
 
-      // Envoyer confirmation WhatsApp (en arrière-plan, ne bloque pas)
-      sendPaymentConfirmationWhatsApp(student.id, payment.id).catch(err => {
-        logger.error('Erreur envoi WhatsApp (non bloquant)', err)
-        // Ne pas afficher d'erreur à l'utilisateur, c'est optionnel
-      })
+      if (WHATSAPP_ENABLED) {
+        sendPaymentConfirmationWhatsApp(student.id, payment.id).catch(err => {
+          logger.error('Erreur envoi WhatsApp (non bloquant)', err)
+        })
+      }
 
       // Générer et télécharger le reçu PDF
       try {
@@ -212,13 +214,41 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
           .eq('id', student.id)
           .single()
 
-        const doc = await generateReceiptPDF(payment, studentData || student)
-        const studentName = `${student.nom} ${student.prenom || ''}`.trim()
-        downloadReceipt(doc, studentName, payment.created_at || new Date().toISOString())
-        toast.success('Reçu généré et téléchargé')
-      } catch (receiptError) {
-        logger.error('Erreur lors de la génération du reçu', receiptError, { paymentId: payment?.id })
-        toast.error('Paiement enregistré mais erreur lors de la génération du reçu')
+        const updatedStudent = studentData || student
+
+        // Générer et télécharger le reçu PDF
+        try {
+          const doc = await generateReceiptPDF(payment, updatedStudent)
+          const studentName = `${student.nom} ${student.prenom || ''}`.trim()
+          downloadReceipt(doc, studentName, payment.created_at || new Date().toISOString())
+          toast.success('Reçu généré et téléchargé')
+        } catch (receiptError) {
+          logger.error('Erreur lors de la génération du reçu', receiptError, { paymentId: payment?.id })
+          toast.error('Paiement enregistré mais erreur lors de la génération du reçu')
+        }
+
+        // Télécharger automatiquement le QR code
+        try {
+          const { downloadQRCodeFromToken } = await import('../../utils/qrDownload')
+          // Petit délai pour laisser le reçu se télécharger d'abord
+          setTimeout(() => {
+            downloadQRCodeFromToken(updatedStudent)
+              .then(() => {
+                toast.success('QR Code téléchargé automatiquement')
+              })
+              .catch((qrError) => {
+                logger.error('Erreur lors du téléchargement du QR code', qrError, { studentId: student?.id })
+                toast.error('QR Code non téléchargé automatiquement')
+              })
+          }, 1000)
+        } catch (qrError) {
+          logger.error('Erreur lors du téléchargement automatique du QR code', qrError, { studentId: student?.id })
+          // Ne pas bloquer le paiement si le QR code ne se télécharge pas
+        }
+
+      } catch (error) {
+        logger.error('Erreur lors de la récupération des données étudiant', error, { studentId: student?.id })
+        toast.error('Paiement enregistré mais erreur lors de la récupération des données')
       }
 
       toast.success('Paiement enregistré avec succès')
@@ -362,7 +392,7 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
                 </div>
                 {formData.paiement_anticipe && (
                   <p className="text-sm text-gray-700 mt-1">
-                    Ce paiement couvrira les mois futurs. L'étudiant sera marqué comme ACTIF dès maintenant.
+                    Ce paiement couvrira les mois futurs. L&apos;étudiant sera marqué comme ACTIF dès maintenant.
                   </p>
                 )}
               </div>
@@ -454,7 +484,7 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
                   ⚠️ {calculated.pausedMonthsExcluded.length} mois hors service exclu(s) : {formatMonthsListFrench(calculated.pausedMonthsExcluded)}
                 </p>
                 <p className="text-xs text-orange-600 mt-1">
-                  L'abonnement a été automatiquement décalé pour couvrir {formData.nombre_mois} mois actifs.
+                  L&apos;abonnement a été automatiquement décalé pour couvrir {formData.nombre_mois} mois actifs.
                 </p>
               </div>
             )}

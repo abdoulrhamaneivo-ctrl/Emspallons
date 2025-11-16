@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Download, MessageCircle } from 'lucide-react'
 import { generateReceiptPDF, downloadReceipt, generateWhatsAppLink } from '../../services/receiptService'
 import AnimatedButton from '../ui/AnimatedButton'
@@ -8,22 +8,26 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
   const [pdfBlob, setPdfBlob] = useState(null)
   const [pdfUrl, setPdfUrl] = useState(null)
   const [loading, setLoading] = useState(false)
+  const lastGeneratedKey = useRef(null)
+
+  const cacheKey = payment?.id && student?.id ? `${payment.id}-${student.id}` : null
 
   useEffect(() => {
-    if (isOpen && payment && student) {
-      generatePDF()
+    if (isOpen && cacheKey) {
+      if (lastGeneratedKey.current !== cacheKey) {
+        generatePDF(cacheKey)
+      }
     }
 
     return () => {
-      // Nettoyer l'URL du blob
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl)
       }
     }
-  }, [isOpen, payment, student])
+  }, [isOpen, cacheKey, pdfUrl, generatePDF])
 
-  const generatePDF = async () => {
-    if (!payment || !student) return
+  const generatePDF = useCallback(async (keyOverride = cacheKey) => {
+    if (!payment || !student || !keyOverride) return
 
     setLoading(true)
     try {
@@ -35,13 +39,14 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
       
       setPdfBlob(blob)
       setPdfUrl(url)
+      lastGeneratedKey.current = keyOverride
     } catch (error) {
       console.error('Erreur lors de la génération du PDF:', error)
       toast.error('Erreur lors de la génération du reçu')
     } finally {
       setLoading(false)
     }
-  }
+  }, [payment, student, cacheKey])
 
   const handleDownload = async () => {
     if (!payment || !student) return

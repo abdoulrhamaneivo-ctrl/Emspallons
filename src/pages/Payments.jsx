@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
@@ -14,14 +14,12 @@ import { LoadingSkeleton } from '../components/ui/LoadingSkeleton'
 import PaymentModal from '../components/payments/PaymentModal'
 import SelectStudentModal from '../components/payments/SelectStudentModal'
 import ReceiptPreviewModal from '../components/payments/ReceiptPreviewModal'
-import { useStudents } from '../hooks/useStudents'
 import { generateReceiptPDF, downloadReceipt } from '../services/receiptService'
 import { formatDate } from '../lib/utils'
 import logger from '../lib/logger'
 
 export default function Payments() {
   const location = useLocation()
-  const { students } = useStudents()
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -93,16 +91,27 @@ export default function Payments() {
     }
   }
 
+  const receiptCacheRef = useRef(new Map())
+
+  const getReceiptFromCache = async (payment, student) => {
+    const key = `${payment.id}-${student.id}`
+    if (receiptCacheRef.current.has(key)) {
+      return receiptCacheRef.current.get(key)
+    }
+    const doc = await generateReceiptPDF(payment, student)
+    receiptCacheRef.current.set(key, doc)
+    return doc
+  }
+
   const handleDownloadReceipt = async (payment) => {
     try {
-      // Récupérer les données complètes de l'étudiant
       const student = payment.students
       if (!student) {
         toast.error('Données étudiant introuvables')
         return
       }
 
-      const doc = await generateReceiptPDF(payment, student)
+      const doc = await getReceiptFromCache(payment, student)
       const studentName = `${student.nom} ${student.prenom || ''}`.trim()
       downloadReceipt(doc, studentName, payment.created_at || new Date().toISOString())
       toast.success('Reçu téléchargé')

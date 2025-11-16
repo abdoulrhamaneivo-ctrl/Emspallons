@@ -60,7 +60,22 @@ const buildStats = (payments, students, selectedMonth) => {
     categories[type] += 1
   })
 
-  // Statistiques par ligne (abonnés)
+  // Statistiques par statut (ACTIF, EN_RETARD, EXPIRE, HORS_SERVICE)
+  const parStatut = {
+    ACTIF: 0,
+    EN_RETARD: 0,
+    EXPIRE: 0,
+    HORS_SERVICE: 0,
+  }
+  
+  students.forEach((student) => {
+    const statut = student.statutPourMois || student.statut_paiement || 'EXPIRE'
+    if (parStatut.hasOwnProperty(statut)) {
+      parStatut[statut] = (parStatut[statut] || 0) + 1
+    }
+  })
+
+  // Statistiques par ligne (abonnés) - TOUS les étudiants
   const parLigne = {}
   students.forEach((student) => {
     const line = student.lines?.nom || 'Sans ligne'
@@ -94,7 +109,13 @@ const buildStats = (payments, students, selectedMonth) => {
   // Classement des lignes par montant total payé
   const classementMontant = [...classementAbonnes].sort((a, b) => b.montantTotal - a.montantTotal)
 
-  const revenuTheorique = students.length * PRIX_MENSUEL
+  // Total étudiants (TOUS les étudiants, pas seulement ceux qui ont payé)
+  const totalEtudiants = students.length
+  
+  // Étudiants actifs = ceux qui ont le statut ACTIF pour le mois sélectionné
+  const etudiantsActifs = parStatut.ACTIF || 0
+  
+  const revenuTheorique = totalEtudiants * PRIX_MENSUEL
   const tauxRecouvrement =
     revenuTheorique > 0 ? ((totalEncaisse / revenuTheorique) * 100).toFixed(1) : '0'
 
@@ -105,7 +126,9 @@ const buildStats = (payments, students, selectedMonth) => {
     paiementsNormaux: categories.normaux,
     paiementsAnticipes: categories.anticipes,
     paiementsRetard: categories.retard,
-    etudiantsActifs: students.length,
+    totalEtudiants, // Total de tous les étudiants
+    etudiantsActifs, // Seulement ceux avec statut ACTIF pour ce mois
+    parStatut, // Répartition par statut
     revenuTheorique,
     tauxRecouvrement,
     parLigne,
@@ -148,6 +171,38 @@ export default function BilanMensuel() {
         setBilanData(null)
         return
       }
+      
+      // Récupérer les mois hors service depuis settings
+      let pausedMonths = []
+      try {
+        const { data: settings } = await supabase
+          .from('settings')
+          .select('paused_months')
+          .limit(1)
+          .single()
+        
+        if (settings?.paused_months) {
+          pausedMonths = settings.paused_months
+        }
+      } catch (error) {
+        logger.debug('Erreur récupération paused_months pour bilan', error)
+      }
+      
+      // Vérifier si le mois sélectionné est un mois hors service
+      if (pausedMonths.includes(selectedMonth)) {
+        logger.info('Mois sélectionné est hors service', { month: selectedMonth })
+        toast.info('Ce mois est marqué comme hors service (vacances). Aucun bilan disponible.')
+        setBilanData({
+          payments: [],
+          students: [],
+          stats: buildStats([], [], selectedMonth),
+          allPayments: [],
+          allStudents: [],
+          pausedMonth: true
+        })
+        return
+      }
+      
       const [year, month] = selectedMonth.split('-').map(Number)
       const startDate = `${selectedMonth}-01T00:00:00`
       const endDate = new Date(year, month, 0)
@@ -182,6 +237,24 @@ export default function BilanMensuel() {
 
       if (paymentsError) throw paymentsError
 
+      // Filtrer les paiements pour exclure ceux qui concernent uniquement des mois hors service
+      // Un paiement est valide pour ce mois si :
+      // 1. Il a des sessions qui incluent le mois sélectionné
+      // 2. ET le mois sélectionné n'est pas dans pausedMonths (déjà vérifié)
+      // 3. ET au moins une session du paiement est valide (pas dans pausedMonths)
+      const validPayments = (payments || []).filter(payment => {
+        const paymentSessions = payment.sessions || []
+        if (paymentSessions.length === 0) return false
+        
+        // Filtrer les sessions pour exclure les mois hors service
+        const validSessions = paymentSessions.filter(session => !pausedMonths.includes(session))
+        
+        // Le paiement est valide si :
+        // - Il a au moins une session valide
+        // - ET le mois sélectionné est dans les sessions valides (pas dans pausedMonths car déjà vérifié)
+        return validSessions.length > 0 && validSessions.includes(selectedMonth)
+      })
+
       const studentSelect = `
           id,
           nom,
@@ -198,35 +271,78 @@ export default function BilanMensuel() {
           )
         `
 
+      // CHANGEMENT IMPORTANT : Charger TOUS les étudiants, pas seulement ceux qui ont payé pour ce mois
+      // Le bilan mensuel doit afficher tous les étudiants avec leur statut pour le mois sélectionné
       let students = []
-      const { data: directStudents, error: directError } = await supabase
+      const { data: allStudentsData, error: studentsError } = await supabase
         .from('students')
         .select(studentSelect)
-        .contains('months_ledger', [selectedMonth])
 
-      if (directError) {
-        logger.warn('Filtre months_ledger indisponible, fallback client', directError)
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('students')
-          .select(studentSelect)
-        if (fallbackError) throw fallbackError
-        students = (fallbackData || []).filter((student) =>
-          (student.months_ledger || []).includes(selectedMonth)
-        )
-      } else {
-        students = directStudents || []
-      }
+      if (studentsError) throw studentsError
+      students = allStudentsData || []
+
+      // Pour chaque étudiant, calculer son statut pour le mois sélectionné
+      // Un étudiant apparaît dans le bilan s'il :
+      // 1. A au moins une session valide dans son months_ledger (après exclusion des mois hors service)
+      // 2. OU n'a aucune session (étudiant sans paiement) - pour voir tous les étudiants
+      const validStudents = (students || []).map(student => {
+        const studentSessions = student.months_ledger || []
+        
+        // Filtrer les sessions pour exclure les mois hors service
+        const validSessions = studentSessions.filter(session => !pausedMonths.includes(session))
+        
+        // Calculer le statut pour le mois sélectionné
+        let statutPourMois = 'EXPIRE'
+        
+        if (pausedMonths.includes(selectedMonth)) {
+          // Si le mois est hors service, tous les étudiants sont hors service
+          statutPourMois = 'HORS_SERVICE'
+        } else if (validSessions.includes(selectedMonth)) {
+          // Si le mois est dans les sessions valides, l'étudiant est actif
+          statutPourMois = 'ACTIF'
+        } else if (validSessions.length > 0) {
+          // Vérifier si l'étudiant est en retard ou expiré
+          const lastValidMonth = validSessions.sort().pop()
+          if (lastValidMonth && lastValidMonth < selectedMonth) {
+            // Calculer si on est dans la période de grâce (5 jours après le dernier mois payé)
+            const [year, month] = lastValidMonth.split('-').map(Number)
+            const lastPaidDate = new Date(year, month, 1) // Premier jour du mois payé
+            const nextMonthDate = new Date(year, month + 1, 1) // Premier jour du mois suivant
+            const graceEndDate = new Date(nextMonthDate)
+            graceEndDate.setDate(graceEndDate.getDate() + 5) // 5 jours de grâce
+            
+            const selectedDate = new Date(selectedMonth + '-01')
+            if (selectedDate <= graceEndDate) {
+              statutPourMois = 'EN_RETARD'
+            } else {
+              statutPourMois = 'EXPIRE'
+            }
+          } else {
+            statutPourMois = 'EXPIRE'
+          }
+        }
+        
+        return {
+          ...student,
+          statutPourMois, // Statut calculé pour le mois sélectionné
+          validSessions // Sessions valides (hors service exclus)
+        }
+      }).filter(student => {
+        // Inclure TOUS les étudiants dans le bilan, même ceux sans paiement
+        // On filtre seulement si on veut exclure certains cas spéciaux
+        return true
+      })
 
       // Filtrer par ligne si une ligne est sélectionnée
-      let filteredPayments = payments || []
-      let filteredStudents = students || []
+      let filteredPayments = validPayments
+      let filteredStudents = validStudents
 
       if (selectedLigne !== 'all') {
         // Trouver l'ID de la ligne sélectionnée
         const ligne = lignes.find(l => l.id === selectedLigne || l.nom === selectedLigne)
         if (ligne) {
-          filteredPayments = (payments || []).filter(p => p.student?.ligne_id === ligne.id)
-          filteredStudents = (students || []).filter(s => s.ligne_id === ligne.id)
+          filteredPayments = validPayments.filter(p => p.student?.ligne_id === ligne.id)
+          filteredStudents = validStudents.filter(s => s.ligne_id === ligne.id)
         }
       }
 
@@ -235,8 +351,9 @@ export default function BilanMensuel() {
         payments: filteredPayments,
         students: filteredStudents,
         stats,
-        allPayments: payments || [],
-        allStudents: students || [],
+        allPayments: validPayments,
+        allStudents: validStudents,
+        pausedMonth: false
       })
     } catch (error) {
       logger.error('Erreur chargement bilan mensuel', error, { selectedMonth })
@@ -253,7 +370,7 @@ export default function BilanMensuel() {
 
   const moisLisible = useMemo(() => formatMonthLabel(selectedMonth), [selectedMonth])
 
-  const exportBilanExcel = () => {
+  const exportBilanExcel = async () => {
     if (!bilanData) return
 
     try {
@@ -270,31 +387,55 @@ export default function BilanMensuel() {
         ['Montant moyen', Math.round(bilanData.stats.montantMoyen)],
         [],
         ['Étudiants'],
+        ['Total étudiants', bilanData.stats.totalEtudiants || 0],
         ['Étudiants actifs', bilanData.stats.etudiantsActifs],
         ['Revenu théorique', bilanData.stats.revenuTheorique],
-        ['Taux de recouvrement', `${bilanData.stats.tauxRecouvrement}%`],
+        ['Taux de recouvrement', `${bilanData.stats.tauxRecouvrement}% (${bilanData.stats.totalEncaisse.toLocaleString('fr-FR')} / ${bilanData.stats.revenuTheorique.toLocaleString('fr-FR')} FCFA)`],
       ]
 
       const ws1 = XLSX.utils.aoa_to_sheet(resumeData)
       XLSX.utils.book_append_sheet(wb, ws1, 'Résumé')
 
+      // Récupérer les mois hors service pour l'export
+      let pausedMonths = []
+      try {
+        const { data: settings } = await supabase
+          .from('settings')
+          .select('paused_months')
+          .limit(1)
+          .single()
+        
+        if (settings?.paused_months) {
+          pausedMonths = settings.paused_months
+        }
+      } catch (error) {
+        logger.debug('Erreur récupération paused_months pour export', error)
+      }
+      
+      // Fonction pour filtrer les sessions valides (hors service exclus)
+      const filterValidSessions = (sessions) => {
+        return (sessions || []).filter(session => !pausedMonths.includes(session))
+      }
+
       const paymentsData = bilanData.payments.map((payment) => {
-        const sessions = payment.sessions || []
+        const allSessions = payment.sessions || []
+        // Filtrer pour ne garder que les mois valides (hors service exclus)
+        const validSessions = filterValidSessions(allSessions)
         const currentMonth = selectedMonth
         let moisCouverts = '-'
         
-        // Si le paiement couvre plusieurs mois, montrer le format "1/5"
-        if (sessions.length > 1) {
-          const monthIndex = sessions.indexOf(currentMonth)
+        // Si le paiement couvre plusieurs mois, montrer le format "1/5" basé sur les mois valides
+        if (validSessions.length > 1) {
+          const monthIndex = validSessions.indexOf(currentMonth)
           if (monthIndex !== -1) {
-            // Format "1/5" pour ce mois dans le bilan
-            moisCouverts = `${monthIndex + 1}/${sessions.length} (${sessions.join(', ')})`
+            // Format "1/5" pour ce mois dans le bilan (basé sur les mois valides uniquement)
+            moisCouverts = `${monthIndex + 1}/${validSessions.length} (${validSessions.join(', ')})`
           } else {
             // Ce mois n'est pas dans ce paiement
-            moisCouverts = `0/${sessions.length} (${sessions.join(', ')})`
+            moisCouverts = `0/${validSessions.length} (${validSessions.join(', ')})`
           }
-        } else if (sessions.length === 1) {
-          moisCouverts = sessions[0]
+        } else if (validSessions.length === 1) {
+          moisCouverts = validSessions[0]
         }
         
         return {
@@ -302,14 +443,14 @@ export default function BilanMensuel() {
           Référence: generateReference(payment.id, payment.created_at),
           Étudiant: `${payment.student?.nom || ''} ${payment.student?.prenom || ''}`.trim(),
           'Ligne de car': payment.student?.lines?.nom || '-',
-          'Mois couverts': moisCouverts,
-          'Position dans paiement': sessions.length > 1 && sessions.indexOf(currentMonth) !== -1 
-            ? `${sessions.indexOf(currentMonth) + 1}/${sessions.length}`
-            : sessions.length > 1 ? `0/${sessions.length}` : '1/1',
-          'Nombre total de mois': payment.nombre_mois || sessions.length || 0,
+          'Mois couverts (hors service exclus)': moisCouverts,
+          'Position dans paiement': validSessions.length > 1 && validSessions.indexOf(currentMonth) !== -1 
+            ? `${validSessions.indexOf(currentMonth) + 1}/${validSessions.length}`
+            : validSessions.length > 1 ? `0/${validSessions.length}` : '1/1',
+          'Nombre total de mois (valides)': validSessions.length || 0,
           'Montant total (FCFA)': payment.montant_total || 0,
-          'Montant ce mois (FCFA)': sessions.length > 0 && sessions.includes(currentMonth)
-            ? Math.round((payment.montant_total || 0) / sessions.length)
+          'Montant ce mois (FCFA)': validSessions.length > 0 && validSessions.includes(currentMonth)
+            ? Math.round((payment.montant_total || 0) / validSessions.length)
             : 0,
         }
       })
@@ -421,6 +562,23 @@ export default function BilanMensuel() {
             <Card className="p-10 text-center">
               <p className="text-gray-600">Aucune donnée disponible pour ce mois.</p>
             </Card>
+          ) : bilanData.pausedMonth ? (
+            <Card className="p-10 text-center bg-orange-50 border-2 border-orange-200">
+              <div className="flex flex-col items-center gap-4">
+                <AlertCircle className="text-orange-600" size={48} />
+                <div>
+                  <h2 className="text-2xl font-bold text-orange-800 mb-2">
+                    Mois hors service
+                  </h2>
+                  <p className="text-orange-700 text-lg mb-2">
+                    Le mois <span className="font-semibold">{moisLisible}</span> est marqué comme hors service (vacances).
+                  </p>
+                  <p className="text-orange-600 text-sm">
+                    Aucun bilan disponible pour cette période. Les paiements effectués pendant ce mois ont été automatiquement reportés au prochain mois en service.
+                  </p>
+                </div>
+              </div>
+            </Card>
           ) : (
             <>
               <div className="hidden print:block text-center space-y-1">
@@ -428,7 +586,7 @@ export default function BilanMensuel() {
                 <p>{`Bilan du ${moisLisible}`}</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                 <Card className="p-5 bg-gradient-to-br from-green-50 to-white border-l-4 border-green-500">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm text-gray-500">Total encaissé</p>
@@ -451,6 +609,18 @@ export default function BilanMensuel() {
                     {bilanData.stats.revenuTheorique.toLocaleString('fr-FR')} FCFA
                   </p>
                 </Card>
+                <Card className="p-5 bg-gradient-to-br from-gray-50 to-white border-l-4 border-gray-500">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-500">Total étudiants</p>
+                    <Users className="text-gray-600" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold text-gray-700">
+                    <AnimatedCounter value={bilanData.stats.totalEtudiants || bilanData.stats.etudiantsActifs || 0} />
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {bilanData.stats.totalEtudiants || 0} étudiant{(bilanData.stats.totalEtudiants || 0) > 1 ? 's' : ''}
+                  </p>
+                </Card>
                 <Card className="p-5 bg-gradient-to-br from-purple-50 to-white border-l-4 border-purple-500">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm text-gray-500">Étudiants actifs</p>
@@ -458,6 +628,11 @@ export default function BilanMensuel() {
                   </div>
                   <p className="text-3xl font-bold text-purple-700">
                     <AnimatedCounter value={bilanData.stats.etudiantsActifs} />
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {bilanData.stats.totalEtudiants > 0 
+                      ? `${Math.round((bilanData.stats.etudiantsActifs / bilanData.stats.totalEtudiants) * 100)}%`
+                      : '0%'} ({((bilanData.stats.etudiantsActifs || 0) * PRIX_MENSUEL).toLocaleString('fr-FR')} FCFA)
                   </p>
                 </Card>
                 <Card className="p-5 bg-gradient-to-br from-orange-50 to-white border-l-4 border-orange-500">
@@ -475,6 +650,40 @@ export default function BilanMensuel() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Répartition par statut */}
+                <Card className="p-5">
+                  <p className="text-sm text-gray-500 mb-3 font-medium">Répartition par statut</p>
+                  <div className="space-y-3">
+                    {bilanData.stats.parStatut && Object.entries(bilanData.stats.parStatut)
+                      .filter(([, count]) => count > 0)
+                      .map(([statut, count]) => {
+                        const percent = bilanData.stats.totalEtudiants > 0
+                          ? Math.round((count / bilanData.stats.totalEtudiants) * 100)
+                          : 0
+                        const montant = count * PRIX_MENSUEL
+                        const statutLabels = {
+                          ACTIF: 'Actifs',
+                          EN_RETARD: 'En retard',
+                          EXPIRE: 'Expirés',
+                          HORS_SERVICE: 'Hors service'
+                        }
+                        const statutColors = {
+                          ACTIF: 'text-emsp-green',
+                          EN_RETARD: 'text-orange-600',
+                          EXPIRE: 'text-red-600',
+                          HORS_SERVICE: 'text-gray-600'
+                        }
+                        return (
+                          <div key={statut} className="flex items-center justify-between">
+                            <span>{statutLabels[statut] || statut}</span>
+                            <span className={`font-semibold ${statutColors[statut] || 'text-gray-600'}`}>
+                              {count} ({percent}%) - {montant.toLocaleString('fr-FR')} FCFA
+                            </span>
+                          </div>
+                        )
+                      })}
+                  </div>
+                </Card>
                 <Card className="p-5">
                   <p className="text-sm text-gray-500 mb-3 font-medium">Répartition par type</p>
                   <div className="space-y-3">
@@ -498,22 +707,23 @@ export default function BilanMensuel() {
                     </div>
                   </div>
                 </Card>
-                <Card className="p-5 md:col-span-2">
+                <Card className="p-5">
                   <p className="text-sm text-gray-500 mb-3 font-medium">Répartition par ligne</p>
                   <div className="space-y-3">
                     {Object.entries(bilanData.stats.parLigne)
                       .sort(([, a], [, b]) => b - a)
                       .map(([line, count]) => {
                         const percent =
-                          bilanData.stats.etudiantsActifs > 0
-                            ? Math.round((count / bilanData.stats.etudiantsActifs) * 100)
+                          bilanData.stats.totalEtudiants > 0
+                            ? Math.round((count / bilanData.stats.totalEtudiants) * 100)
                             : 0
+                        const montant = count * PRIX_MENSUEL
                         return (
                           <div key={line}>
                             <div className="flex justify-between text-sm">
                               <span>{line}</span>
                               <span className="text-gray-600">
-                                {count} étudiant{count > 1 ? 's' : ''} ({percent}%)
+                                {count} étudiant{count > 1 ? 's' : ''} ({percent}%) - {montant.toLocaleString('fr-FR')} FCFA
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
@@ -566,7 +776,7 @@ export default function BilanMensuel() {
                               </div>
                               <div>
                                 <span className="font-medium">Taux recouvrement :</span>{' '}
-                                {ligne.tauxRecouvrement}%
+                                {ligne.tauxRecouvrement}% ({ligne.montantTotal.toLocaleString('fr-FR')} / {ligne.revenuTheorique.toLocaleString('fr-FR')} FCFA)
                               </div>
                             </div>
                           </div>

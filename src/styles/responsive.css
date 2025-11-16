@@ -14,8 +14,40 @@
     inset: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh; /* Dynamic viewport height pour mobile */
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* Zone de scan - prend tout l'espace disponible */
+  .scanner-container > div:first-child {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  /* Scanner interne - s'adapte à la taille disponible */
+  .scanner-container #qr-reader,
+  .scanner-container [id^="qr-reader"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 300px;
+  }
+
+  /* Canvas/vidéo du scanner */
+  .scanner-container video,
+  .scanner-container canvas {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
   }
 
   .scanner-controls {
@@ -25,22 +57,29 @@
     right: 0;
     padding: 1rem;
     padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-    z-index: 10;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7), transparent);
+    z-index: 50;
+    flex-shrink: 0;
   }
 
   .scanner-button {
-    min-width: 48px;
-    min-height: 48px;
-    padding: 0.75rem 1.5rem;
+    min-width: 56px;
+    min-height: 56px;
+    padding: 0.875rem 1.5rem;
     font-size: 1rem;
     border-radius: 12px;
+    font-weight: 600;
   }
 
   /* Rotation auto en paysage */
   @media (orientation: landscape) {
     .scanner-container {
       flex-direction: row;
+    }
+
+    .scanner-container > div:first-child {
+      flex: 1;
+      min-width: 0;
     }
 
     .scanner-controls {
@@ -50,9 +89,16 @@
       transform: translateY(-50%);
       bottom: auto;
       left: auto;
-      background: linear-gradient(to left, rgba(0, 0, 0, 0.8), transparent);
+      background: linear-gradient(to left, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7), transparent);
       padding: 1rem;
       padding-right: calc(1rem + env(safe-area-inset-right));
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .scanner-button {
+      min-width: 56px;
+      min-height: 56px;
     }
   }
 }

@@ -1,0 +1,214 @@
+/* ============================================
+   CORRECTIONS MOBILE - BOUTONS CLIQUABLES
+   ============================================ */
+
+/* 1. Touch targets minimum 44x44px (recommandation Apple/Google) */
+button,
+a.button,
+.btn,
+[role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+  position: relative;
+}
+
+/* 2. Zone cliquable étendue pour petits boutons */
+button:not(.no-extend)::before,
+a.button:not(.no-extend)::before,
+.btn:not(.no-extend)::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  z-index: -1;
+}
+
+/* 3. Désactiver le highlight par défaut sur mobile */
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: rgba(253, 185, 19, 0.3);
+  -webkit-touch-callout: none;
+}
+
+/* 4. Curseur pointer sur tous les éléments cliquables */
+button:not(:disabled),
+a:not([disabled]),
+[role="button"]:not([disabled]),
+.clickable {
+  cursor: pointer;
+  pointer-events: auto !important;
+}
+
+/* 5. Feedback visuel au touch */
+button:active,
+a.button:active,
+.btn:active {
+  transform: scale(0.97);
+  opacity: 0.8;
+  transition: all 0.1s ease;
+}
+
+/* 6. Désactiver pointer-events sur les overlays, pas sur le contenu */
+.overlay {
+  pointer-events: auto;
+}
+
+.overlay-content {
+  pointer-events: auto !important;
+}
+
+/* 7. S'assurer que les modals sont cliquables */
+.modal,
+[role="dialog"] {
+  pointer-events: auto !important;
+  z-index: 9999;
+}
+
+.modal-backdrop,
+.modal-overlay {
+  pointer-events: auto;
+  z-index: 9998;
+}
+
+.modal-content,
+.modal-body {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 10000;
+}
+
+/* 8. Sidebar mobile - ne doit pas bloquer le contenu */
+@media (max-width: 768px) {
+  .sidebar {
+    pointer-events: none;
+  }
+  
+  .sidebar.open {
+    pointer-events: auto;
+  }
+  
+  .sidebar-overlay {
+    pointer-events: auto;
+    z-index: 998;
+  }
+  
+  .sidebar-content {
+    pointer-events: auto;
+    z-index: 999;
+  }
+  
+  /* Main content doit être cliquable */
+  main,
+  .main-content {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 1;
+  }
+}
+
+/* 9. Cards et conteneurs cliquables */
+.card button,
+.card a,
+.card [role="button"] {
+  pointer-events: auto !important;
+  z-index: 10;
+  position: relative;
+}
+
+/* 10. Fix pour les dropdowns */
+.dropdown-menu,
+.dropdown-content {
+  pointer-events: auto !important;
+  z-index: 1000;
+}
+
+/* 11. Fix pour les icônes dans les boutons */
+button svg,
+button img,
+a svg,
+a img {
+  pointer-events: none; /* L'icône ne doit pas intercepter le clic */
+}
+
+/* 12. S'assurer que les liens fonctionnent */
+a {
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+/* 13. Inputs et selects */
+input,
+select,
+textarea {
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+/* 14. Tables responsive */
+@media (max-width: 768px) {
+  table button,
+  table a {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* 15. Fix pour les tooltips */
+[data-tooltip],
+[title] {
+  pointer-events: auto !important;
+}
+
+/* 16. Désactiver le zoom sur double-tap pour les boutons */
+button,
+a.button,
+.btn {
+  touch-action: manipulation;
+}
+
+/* 17. Fix pour les toggle switches */
+input[type="checkbox"],
+input[type="radio"] {
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+/* 18. Fix pour les scroll containers */
+.overflow-auto,
+.overflow-scroll {
+  -webkit-overflow-scrolling: touch;
+  pointer-events: auto !important;
+}
+
+/* 19. Bottom navigation mobile */
+@media (max-width: 768px) {
+  .bottom-nav {
+    pointer-events: auto !important;
+    z-index: 1000;
+  }
+  
+  .bottom-nav button,
+  .bottom-nav a {
+    pointer-events: auto !important;
+    min-width: 60px;
+    min-height: 60px;
+  }
+}
+
+/* 20. Fix pour les overlays qui bloquent */
+@media (max-width: 768px) {
+  /* S'assurer que le contenu principal est toujours cliquable */
+  body > div > main,
+  body > div > div > main {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 1;
+  }
+}
+

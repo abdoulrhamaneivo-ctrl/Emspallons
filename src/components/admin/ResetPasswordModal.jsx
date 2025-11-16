@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Copy, Check, RefreshCw, Mail } from 'lucide-react'
 import AnimatedModal from '../ui/AnimatedModal'
 import AnimatedButton from '../ui/AnimatedButton'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import logger from '../../lib/logger'
 
 // Génère un mot de passe sécurisé
 const generateSecurePassword = () => {
@@ -91,19 +92,26 @@ export default function ResetPasswordModal({ isOpen, onClose, user, onSuccess })
       // Logger dans activity_logs
       try {
         const { data: currentUser } = await supabase.auth.getUser()
-        await supabase.from('activity_logs').insert([
-          {
-            user_id: currentUser?.user?.id,
-            action: 'PASSWORD_RESET',
-            description: `Réinitialisation du mot de passe pour ${user.nom} (${user.email})`,
-            metadata: {
-              reset_user_id: user.id,
-              reset_user_email: user.email,
+        if (currentUser?.user?.id) {
+          await supabase.from('activity_logs').insert([
+            {
+              action: 'PASSWORD_RESET',
+              entity_type: 'USER',
+              user_id: currentUser.user.id,
+              details: {
+                reset_user_id: user.id,
+                reset_user_email: user.email,
+                reset_user_nom: user.nom,
+                send_email: sendEmail,
+                timestamp: new Date().toISOString()
+              },
             },
-          },
-        ])
+          ]).catch((logErr) => {
+            logger.debug('Impossible d\'enregistrer dans activity_logs', logErr)
+          })
+        }
       } catch (logError) {
-        console.warn('Error logging activity:', logError)
+        logger.debug('Erreur lors de l\'enregistrement du log', logError)
       }
 
       // Copier automatiquement le mot de passe
