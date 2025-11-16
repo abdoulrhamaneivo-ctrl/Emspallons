@@ -180,24 +180,8 @@ export default function Dashboard() {
   }
 
 
-  useEffect(() => {
-    // Charger les données de manière progressive (non bloquant)
-    // Attendre que les données principales soient chargées
-    if (!studentsLoading && !paymentsLoading && !scansLoading) {
-      // Charger les données supplémentaires après un court délai (non bloquant)
-      setTimeout(() => {
-        if (role === 'admin' || role === 'educator') {
-          fetchRecentReminders()
-        }
-        loadTodayScans()
-        loadPaymentsData()
-        loadLineData()
-      }, 100) // Petit délai pour permettre au Dashboard de s'afficher rapidement
-    }
-  }, [role, studentsLoading, paymentsLoading, scansLoading, loadPaymentsData, loadLineData])
-
   // Charger les scans par heure (aujourd'hui)
-  const loadTodayScans = async () => {
+  const loadTodayScans = useCallback(async () => {
     try {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
@@ -228,7 +212,7 @@ export default function Dashboard() {
     } catch (error) {
       logger.error('Erreur chargement scans par heure', error)
     }
-  }
+  }, [])
 
   // Charger les données de paiements (7 derniers jours)
   const loadPaymentsData = useCallback(() => {
@@ -270,7 +254,7 @@ export default function Dashboard() {
     setLineData(lineStats)
   }, [students])
 
-  const fetchRecentReminders = async () => {
+  const fetchRecentReminders = useCallback(async () => {
     try {
       setLoadingReminders(true)
       const { data, error } = await supabase
@@ -293,7 +277,23 @@ export default function Dashboard() {
     } finally {
       setLoadingReminders(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // Charger les données de manière progressive (non bloquant)
+    // Attendre que les données principales soient chargées
+    if (!studentsLoading && !paymentsLoading && !scansLoading) {
+      // Charger les données supplémentaires après un court délai (non bloquant)
+      setTimeout(() => {
+        if (role === 'admin' || role === 'educator') {
+          fetchRecentReminders()
+        }
+        loadTodayScans()
+        loadPaymentsData()
+        loadLineData()
+      }, 100) // Petit délai pour permettre au Dashboard de s'afficher rapidement
+    }
+  }, [role, studentsLoading, paymentsLoading, scansLoading, fetchRecentReminders, loadTodayScans, loadPaymentsData, loadLineData])
 
   const handleGenerateReport = async () => {
     try {
