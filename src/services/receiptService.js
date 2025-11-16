@@ -60,12 +60,13 @@ const generateQRCode = async (receiptNumber, paymentId) => {
     })
     
     const qrDataUrl = await QRCode.toDataURL(verificationData, {
-      width: 150,
-      margin: 1,
+      width: 200,
+      margin: 2,
       color: {
         dark: '#2D5016',
         light: '#FFFFFF'
-      }
+      },
+      errorCorrectionLevel: 'H'
     })
     
     return qrDataUrl
@@ -76,7 +77,19 @@ const generateQRCode = async (receiptNumber, paymentId) => {
 }
 
 /**
- * Génère un reçu PDF simple et élégant
+ * Convertit une couleur hex en RGB
+ */
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null
+}
+
+/**
+ * Génère un reçu PDF moderne et professionnel avec design amélioré
  * @param {Object} payment - Données du paiement
  * @param {Object} student - Données de l'étudiant
  * @returns {Promise<jsPDF>} - Document PDF généré
@@ -90,76 +103,109 @@ export const generateReceiptPDF = async (payment, student) => {
 
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  const margin = 20
+  const margin = 15
   const contentWidth = pageWidth - (margin * 2)
 
   // Couleurs EMSP
   const emspGreen = '#2D5016'
   const emspYellow = '#FDB913'
+  const emspLightGreen = '#7CB342'
+  const grayLight = '#F5F5F5'
+  const grayMedium = '#999999'
+  const grayDark = '#333333'
+
+  // Convertir les couleurs hex en RGB
+  const greenRgb = hexToRgb(emspGreen)
+  const yellowRgb = hexToRgb(emspYellow)
+  const lightGreenRgb = hexToRgb(emspLightGreen)
 
   let yPosition = margin
 
   // ============================================
-  // HEADER - Logo et Titre (Simple et Élégant)
+  // HEADER - Design moderne avec bande colorée
   // ============================================
   
-  // Essayer de charger le logo réel
+  // Bande de couleur en haut (gradient simulé)
+  doc.setFillColor(greenRgb.r, greenRgb.g, greenRgb.b)
+  doc.rect(0, 0, pageWidth, 25, 'F')
+  
+  // Deuxième bande (jaune)
+  doc.setFillColor(yellowRgb.r, yellowRgb.g, yellowRgb.b)
+  doc.rect(0, 25, pageWidth, 8, 'F')
+  
+  // Logo ou placeholder
+  yPosition = 35
   try {
     const logoUrl = '/images/logo-ecole.png'
     const logoImg = await loadImage(logoUrl)
     
-    // Calculer la taille du logo (max 40mm de hauteur)
-    const logoMaxHeight = 40
+    const logoMaxHeight = 25
     const logoAspectRatio = logoImg.width / logoImg.height
     const logoHeight = logoMaxHeight
     const logoWidth = logoHeight * logoAspectRatio
-    
-    // Centrer le logo
     const logoX = (pageWidth - logoWidth) / 2
     
-    doc.addImage(logoImg, 'PNG', logoX, yPosition, logoWidth, logoHeight)
-    yPosition += logoHeight + 10
+    doc.addImage(logoImg, 'PNG', logoX, 5, logoWidth, logoHeight)
   } catch (error) {
-    console.warn('Logo non trouvé, utilisation du placeholder')
-    // Placeholder simple si le logo n'est pas trouvé
-    doc.setFillColor(emspYellow)
-    doc.circle(pageWidth / 2, yPosition + 15, 15, 'F')
-    doc.setFillColor(emspGreen)
-    doc.circle(pageWidth / 2, yPosition + 15, 12, 'F')
+    // Logo stylisé si non trouvé
+    doc.setFillColor(yellowRgb.r, yellowRgb.g, yellowRgb.b)
+    doc.circle(pageWidth / 2, 17, 8, 'F')
+    doc.setFillColor(greenRgb.r, greenRgb.g, greenRgb.b)
+    doc.circle(pageWidth / 2, 17, 6, 'F')
     doc.setTextColor('#FFFFFF')
-    doc.setFontSize(16)
+    doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
-    doc.text('EMSP', pageWidth / 2, yPosition + 18, { align: 'center' })
-    yPosition += 40
+    doc.text('EMSP', pageWidth / 2, 19, { align: 'center' })
   }
 
-  // Titre principal
-  doc.setFontSize(20)
+  // Titre principal (dans la bande verte)
+  doc.setFontSize(24)
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(emspGreen)
-  doc.text('REÇU DE PAIEMENT', pageWidth / 2, yPosition, { align: 'center' })
+  doc.setTextColor('#FFFFFF')
+  doc.text('REÇU DE PAIEMENT', pageWidth / 2, 18, { align: 'center' })
 
-  // Numéro de reçu et date
+  yPosition = 50
+
+  // Numéro de reçu dans un encadré
   const receiptNumber = generateReceiptNumber(payment.id)
   const emissionDate = formatDateFrench(new Date().toISOString())
   
+  // Fond gris clair pour le numéro de reçu
+  doc.setFillColor(grayLight.replace('#', '').substring(0, 2) || 245, 245, 245)
+  doc.setDrawColor(greenRgb.r, greenRgb.g, greenRgb.b)
+  doc.setLineWidth(0.5)
+  doc.roundedRect(margin, yPosition, contentWidth, 15, 3, 3, 'FD')
+  
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(emspGreen)
+  doc.text(`N° ${receiptNumber}`, margin + 5, yPosition + 8)
+  
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor('#666666')
-  doc.text(`N° ${receiptNumber}`, pageWidth / 2, yPosition + 5, { align: 'center' })
-  doc.text(`Émis le ${emissionDate}`, pageWidth / 2, yPosition + 9, { align: 'center' })
+  doc.setTextColor(grayDark)
+  doc.text(`Émis le ${emissionDate}`, pageWidth - margin - 5, yPosition + 8, { align: 'right' })
 
-  yPosition += 20
-
-  // Ligne de séparation
-  doc.setDrawColor(emspGreen)
-  doc.setLineWidth(0.5)
-  doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 10
+  yPosition += 22
 
   // ============================================
-  // INFORMATIONS ÉTUDIANT (Tableau simple)
+  // INFORMATIONS ÉTUDIANT - Carte moderne
   // ============================================
+  
+  // Titre de section
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(emspGreen)
+  doc.text('INFORMATIONS ÉTUDIANT', margin, yPosition)
+  
+  yPosition += 8
+
+  // Carte avec fond coloré léger
+  doc.setFillColor(lightGreenRgb.r, lightGreenRgb.g, lightGreenRgb.b)
+  doc.setGState(doc.GState({ opacity: 0.1 }))
+  doc.roundedRect(margin, yPosition, contentWidth, 35, 5, 5, 'F')
+  doc.setGState(doc.GState({ opacity: 1 }))
+
   const studentData = [
     ['Nom complet', `${student.nom} ${student.prenom || ''}`.trim()],
     ['Classe', student.classe || 'N/A'],
@@ -168,31 +214,51 @@ export const generateReceiptPDF = async (payment, student) => {
   ]
 
   autoTable(doc, {
-    startY: yPosition,
+    startY: yPosition + 3,
     head: false,
     body: studentData,
     theme: 'plain',
     styles: {
       fontSize: 10,
-      cellPadding: 4,
+      cellPadding: 5,
+      lineColor: [0, 0, 0, 0], // Pas de bordures visibles
     },
     columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 50, textColor: emspGreen },
-      1: { cellWidth: 'auto' },
+      0: { 
+        fontStyle: 'bold', 
+        cellWidth: 50, 
+        textColor: [greenRgb.r, greenRgb.g, greenRgb.b],
+        font: 'helvetica',
+      },
+      1: { 
+        cellWidth: 'auto',
+        textColor: grayDark,
+      },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin + 3, right: margin + 3 },
+    tableLineColor: [0, 0, 0, 0],
+    tableLineWidth: 0,
   })
 
-  yPosition = doc.lastAutoTable.finalY + 10
+  yPosition = doc.lastAutoTable.finalY + 15
 
   // ============================================
-  // DÉTAILS PAIEMENT (Tableau simple)
+  // DÉTAILS PAIEMENT - Tableau moderne
   // ============================================
+  
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(emspGreen)
+  doc.text('DÉTAILS DU PAIEMENT', margin, yPosition)
+  
+  yPosition += 8
+
   const paymentData = [
-    ['Description', 'Quantité', 'Montant'],
+    ['Description', 'Quantité', 'Montant unitaire', 'Montant total'],
     [
-      'Abonnement transport',
+      'Abonnement transport scolaire',
       `${payment.nombre_mois} mois`,
+      formatCurrency(payment.montant_total / payment.nombre_mois),
       formatCurrency(payment.montant_total)
     ]
   ]
@@ -203,102 +269,154 @@ export const generateReceiptPDF = async (payment, student) => {
     body: [paymentData[1]],
     theme: 'striped',
     headStyles: {
-      fillColor: emspGreen,
-      textColor: '#FFFFFF',
+      fillColor: [greenRgb.r, greenRgb.g, greenRgb.b],
+      textColor: [255, 255, 255],
       fontStyle: 'bold',
-    },
-    styles: {
       fontSize: 10,
-      cellPadding: 4,
+      cellPadding: 6,
+    },
+    bodyStyles: {
+      fontSize: 10,
+      cellPadding: 6,
+      textColor: grayDark,
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
     },
     columnStyles: {
-      0: { cellWidth: 80 },
-      1: { cellWidth: 40, halign: 'center' },
-      2: { cellWidth: 50, halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: 70, fontStyle: 'bold' },
+      1: { cellWidth: 35, halign: 'center' },
+      2: { cellWidth: 40, halign: 'right' },
+      3: { cellWidth: 40, halign: 'right', fontStyle: 'bold', textColor: [greenRgb.r, greenRgb.g, greenRgb.b] },
     },
     margin: { left: margin, right: margin },
   })
 
-  yPosition = doc.lastAutoTable.finalY + 8
+  yPosition = doc.lastAutoTable.finalY + 12
 
-  // Total payé (mis en évidence)
-  doc.setFontSize(14)
+  // Encadré pour le total avec style moderne
+  doc.setFillColor(greenRgb.r, greenRgb.g, greenRgb.b)
+  doc.roundedRect(margin, yPosition, contentWidth, 18, 5, 5, 'F')
+  
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor('#FFFFFF')
+  doc.text('TOTAL PAYÉ', margin + 10, yPosition + 8)
+  doc.text(formatCurrency(payment.montant_total), pageWidth - margin - 10, yPosition + 8, { align: 'right' })
+
+  yPosition += 25
+
+  // ============================================
+  // PÉRIODE COUVERTE - Design moderne
+  // ============================================
+  
+  doc.setFillColor([lightGreenRgb.r, lightGreenRgb.g, lightGreenRgb.b])
+  doc.setGState(doc.GState({ opacity: 0.15 }))
+  doc.roundedRect(margin, yPosition, contentWidth, 25, 5, 5, 'F')
+  doc.setGState(doc.GState({ opacity: 1 }))
+
+  doc.setFontSize(11)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(emspGreen)
-  doc.text('TOTAL PAYÉ:', pageWidth - margin - 50, yPosition, { align: 'right' })
-  doc.text(formatCurrency(payment.montant_total), pageWidth - margin, yPosition, { align: 'right' })
-
-  yPosition += 15
-
-  // Ligne de séparation
-  doc.setDrawColor(emspGreen)
-  doc.setLineWidth(0.5)
-  doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 10
-
-  // ============================================
-  // PÉRIODE COUVERTE (Simple)
-  // ============================================
+  doc.text('PÉRIODE COUVERTE', margin + 5, yPosition + 8)
+  
   doc.setFontSize(10)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(emspGreen)
-  doc.text('Période couverte:', margin, yPosition)
-  
-  doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor('#000000')
-  doc.text(`Du ${formatDateFrench(payment.date_debut)} au ${formatDateFrench(payment.date_fin)}`, margin, yPosition + 5)
+  doc.setTextColor(grayDark)
+  
+  const startDate = formatDateFrench(payment.date_debut)
+  const endDate = formatDateFrench(payment.date_fin)
+  
+  doc.text(`Du ${startDate}`, margin + 5, yPosition + 14)
+  doc.text(`Au ${endDate}`, margin + 5, yPosition + 19)
+  
+  // Icône de calendrier (simulée avec texte)
+  doc.setFontSize(8)
+  doc.setTextColor(grayMedium)
+  doc.text('📅', pageWidth - margin - 30, yPosition + 14)
 
-  yPosition += 15
+  yPosition += 32
 
   // ============================================
-  // FOOTER - QR Code et Informations École
+  // FOOTER - QR Code et Informations (Design moderne)
   // ============================================
   
-  // QR Code (à gauche)
-  const qrCodeSize = 25
+  // Séparateur décoratif
+  doc.setDrawColor(yellowRgb.r, yellowRgb.g, yellowRgb.b)
+  doc.setLineWidth(2)
+  doc.line(margin, yPosition, pageWidth - margin, yPosition)
+  
+  yPosition += 8
+
+  // QR Code dans un encadré moderne
+  const qrCodeSize = 40
   const qrCodeX = margin
   const qrCodeY = yPosition
+  
+  // Encadré pour le QR code
+  doc.setFillColor(grayLight)
+  doc.setDrawColor(greenRgb.r, greenRgb.g, greenRgb.b)
+  doc.setLineWidth(1)
+  doc.roundedRect(qrCodeX, qrCodeY, qrCodeSize + 4, qrCodeSize + 20, 3, 3, 'FD')
   
   try {
     const qrCodeDataUrl = await generateQRCode(receiptNumber, payment.id)
     if (qrCodeDataUrl) {
-      doc.addImage(qrCodeDataUrl, 'PNG', qrCodeX, qrCodeY, qrCodeSize, qrCodeSize)
+      doc.addImage(qrCodeDataUrl, 'PNG', qrCodeX + 2, qrCodeY + 2, qrCodeSize, qrCodeSize)
+      
+      // Texte sous le QR code
+      doc.setFontSize(7)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(grayDark)
+      doc.text('Scanner pour vérifier', qrCodeX + qrCodeSize / 2 + 2, qrCodeY + qrCodeSize + 10, { align: 'center' })
     }
   } catch (error) {
     console.error('Erreur lors de l\'ajout du QR code:', error)
   }
 
-  // Informations école (à droite du QR code)
-  const infoX = qrCodeX + qrCodeSize + 10
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor('#666666')
+  // Informations école dans un encadré moderne
+  const infoX = qrCodeX + qrCodeSize + 15
+  const infoWidth = pageWidth - infoX - margin
+  const infoY = qrCodeY
   
+  // Encadré pour les informations
+  doc.setFillColor(grayLight)
+  doc.setDrawColor(greenRgb.r, greenRgb.g, greenRgb.b)
+  doc.setLineWidth(1)
+  doc.roundedRect(infoX, infoY, infoWidth, qrCodeSize + 20, 3, 3, 'FD')
+  
+  doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(emspGreen)
-  doc.text('École Multinationale Supérieure', infoX, qrCodeY)
-  doc.text('des Postes d\'Abidjan', infoX, qrCodeY + 4)
+  doc.text('École Multinationale Supérieure', infoX + 3, infoY + 6)
+  doc.text('des Postes d\'Abidjan', infoX + 3, infoY + 11)
   
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor('#666666')
-  doc.setFontSize(7)
-  doc.text('18 BP 42 Abidjan 18', infoX, qrCodeY + 8)
-  doc.text('Treichville, Zone 3, Km4', infoX, qrCodeY + 11)
-  doc.text('+225 27 21 21 45 60', infoX, qrCodeY + 14)
-  doc.text('contact@emsp.int', infoX, qrCodeY + 17)
+  doc.setFontSize(8)
+  doc.setTextColor(grayDark)
+  doc.text('📍 18 BP 42 Abidjan 18', infoX + 3, infoY + 17)
+  doc.text('Treichville, Zone 3, Km4', infoX + 3, infoY + 22)
+  doc.text('📞 +225 27 21 21 45 60', infoX + 3, infoY + 27)
+  doc.text('✉️ contact@emsp.int', infoX + 3, infoY + 32)
 
-  // Signature (en bas à droite)
-  const signatureY = pageHeight - margin - 15
+  // Signature (en bas)
+  const signatureY = pageHeight - margin - 25
+  
   doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor('#000000')
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(grayDark)
   doc.text('L\'Administration EMSP', pageWidth - margin, signatureY, { align: 'right' })
   
-  // Ligne de signature
-  doc.setDrawColor('#000000')
-  doc.setLineWidth(0.5)
-  doc.line(pageWidth - margin - 40, signatureY + 3, pageWidth - margin, signatureY + 3)
+  // Ligne de signature avec style
+  doc.setDrawColor(greenRgb.r, greenRgb.g, greenRgb.b)
+  doc.setLineWidth(1)
+  doc.line(pageWidth - margin - 50, signatureY + 3, pageWidth - margin, signatureY + 3)
+
+  // Numéro de page (si plusieurs pages)
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(grayMedium)
+  doc.text(`Page 1/1`, pageWidth / 2, pageHeight - 10, { align: 'center' })
 
   return doc
 }
