@@ -20,7 +20,7 @@ const AVAILABLE_VARIABLES = [
   { key: 'nom_etudiant', label: 'Nom étudiant' },
   { key: 'prenom_etudiant', label: 'Prénom étudiant' },
   { key: 'classe', label: 'Classe' },
-  { key: 'ligne', label: 'Ligne de bus' },
+  { key: 'ligne', label: 'Ligne de car' },
   { key: 'date_expiration', label: 'Date expiration' },
   { key: 'montant', label: 'Montant à payer' },
   { key: 'jours_restants', label: 'Jours restants' },

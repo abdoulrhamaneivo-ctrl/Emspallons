@@ -109,7 +109,7 @@ Tableau avec :
 - Nom complet
 - Classe
 - Promotion
-- Ligne de bus
+- Ligne de car
 - Numéro étudiant (ID court)
 
 ### Section 3 : Détails Paiement

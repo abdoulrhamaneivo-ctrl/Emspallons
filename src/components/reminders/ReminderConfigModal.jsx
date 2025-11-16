@@ -13,7 +13,7 @@ const AVAILABLE_VARIABLES = [
   { key: 'nom_etudiant', label: 'Nom étudiant', example: 'Kouassi' },
   { key: 'prenom_etudiant', label: 'Prénom étudiant', example: 'Jean' },
   { key: 'classe', label: 'Classe', example: '6ème' },
-  { key: 'ligne', label: 'Ligne de bus', example: 'Yopougon' },
+  { key: 'ligne', label: 'Ligne de car', example: 'Yopougon' },
   { key: 'date_expiration', label: 'Date expiration', example: '15/02/2024' },
   { key: 'montant', label: 'Montant à payer', example: '12 500 FCFA' },
   { key: 'jours_restants', label: 'Jours restants', example: '7' },

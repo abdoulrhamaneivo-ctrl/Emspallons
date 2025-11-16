@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle } from 'lucide-react'
 import { Button } from '../components/ui'
@@ -11,7 +11,10 @@ export default function ResetSuccess() {
   useEffect(() => {
     // Redirection automatique après 10 secondes
     const timer = setTimeout(() => {
-      navigate('/dashboard')
+      // Utiliser startTransition pour les lazy-loaded components (React 18)
+      startTransition(() => {
+        navigate('/dashboard')
+      })
     }, 10000)
     
     return () => clearTimeout(timer)
@@ -40,7 +43,12 @@ export default function ResetSuccess() {
             </div>
 
             <Button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => {
+                // Utiliser startTransition pour les lazy-loaded components (React 18)
+                startTransition(() => {
+                  navigate('/dashboard')
+                })
+              }}
               className="w-full bg-emsp-green hover:bg-emsp-lightGreen text-white"
             >
               Retour au tableau de bord

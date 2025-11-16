@@ -9,6 +9,7 @@ import AnimatedButton from '../components/ui/AnimatedButton'
 import PageTransition from '../components/ui/PageTransition'
 import { Input } from '../components/ui'
 import { FloatingShapes, GradientOrb } from '../components/ui/DecorativeElements'
+import logger from '../lib/logger'
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -26,12 +27,26 @@ export default function Register() {
     checkFirstUser()
   }, [])
 
+  const deleteAuthUserViaEdge = async (userId) => {
+    if (!userId) return
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId },
+      })
+
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+    } catch (cleanupError) {
+      logger.error('Erreur lors du nettoyage de l’utilisateur auth', cleanupError, { userId })
+    }
+  }
+
   const checkFirstUser = async () => {
     try {
       const { data, error } = await supabase.rpc('check_if_first_user')
       
       if (error) {
-        console.error('Error checking first user:', error)
+        logger.error('Erreur vérification premier utilisateur', error)
         // En cas d'erreur, rediriger vers login pour sécurité
         navigate('/login')
         return
@@ -46,7 +61,7 @@ export default function Register() {
 
       setChecking(false)
     } catch (error) {
-      console.error('Error in checkFirstUser:', error)
+      logger.error('Erreur dans checkFirstUser', error)
       navigate('/login')
     }
   }
@@ -128,8 +143,8 @@ export default function Register() {
         ])
 
       if (profileError) {
-        // Si la création du profil échoue, supprimer l'utilisateur auth
-        await supabase.auth.admin.deleteUser(authData.user.id).catch(console.error)
+        // Si la création du profil échoue, supprimer l'utilisateur auth via Edge Function sécurisée
+        await deleteAuthUserViaEdge(authData.user.id)
         throw profileError
       }
 
@@ -142,7 +157,7 @@ export default function Register() {
       })
 
       if (signInError) {
-        console.error('Auto-login error:', signInError)
+        logger.error('Erreur lors de l’auto-login', signInError)
         navigate('/login')
         return
       }
@@ -152,7 +167,7 @@ export default function Register() {
         navigate('/dashboard')
       }, 1000)
     } catch (error) {
-      console.error('Registration error:', error)
+      logger.error('Erreur création compte admin', error)
       toast.error(error.message || 'Erreur lors de la création du compte')
     } finally {
       setLoading(false)

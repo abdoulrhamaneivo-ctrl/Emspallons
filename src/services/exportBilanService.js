@@ -93,12 +93,13 @@ export const generateBilanMensuel = async (month, ligneId = null) => {
     const studentIds = (students || []).map(s => s.id)
     let paymentsMap = new Map()
     let lastPaymentsMap = new Map()
+    let allPaymentsData = [] // Stocker pour le calcul du total_encaisse_mois
     
     if (studentIds.length > 0) {
-      // Récupérer tous les paiements pour tous les étudiants
+      // Récupérer tous les paiements pour tous les étudiants (avec sessions pour le calcul précis)
       const { data: allPayments, error: paymentsError } = await supabase
         .from('payments')
-        .select('*')
+        .select('*, sessions')
         .in('student_id', studentIds)
         .order('created_at', { descending: false })
       
@@ -106,6 +107,9 @@ export const generateBilanMensuel = async (month, ligneId = null) => {
         logger.error('Error fetching payments for bilan', paymentsError)
         throw paymentsError
       }
+      
+      // Stocker tous les paiements pour le calcul du total_encaisse_mois
+      allPaymentsData = allPayments || []
       
       // Organiser les paiements par étudiant
       const paymentsByStudent = new Map()
@@ -195,6 +199,25 @@ export const generateBilanMensuel = async (month, ligneId = null) => {
       }
     })
     
+    // Calculer le montant encaissé pour le mois en question
+    // Répartir les paiements multi-mois dans leurs mois respectifs
+    let totalEncaisseMois = 0
+    
+    // Utiliser les paiements déjà récupérés (allPaymentsData)
+    // Pour chaque paiement, répartir le montant selon les mois payés
+    allPaymentsData.forEach(payment => {
+      const sessions = payment.sessions || []
+      if (sessions.length === 0 || !payment.montant_total) return
+      
+      // Vérifier si ce paiement inclut le mois recherché
+      if (sessions.includes(monthStr)) {
+        // Calculer le montant mensuel (montant total divisé par nombre de mois)
+        const montantMensuel = payment.montant_total / sessions.length
+        // Ajouter seulement la part correspondant au mois recherché
+        totalEncaisseMois += montantMensuel
+      }
+    })
+    
     // Calculer les totaux
     const totaux = {
       total_etudiants: studentsWithPayments.length,
@@ -207,18 +230,7 @@ export const generateBilanMensuel = async (month, ligneId = null) => {
       etudiants_expires: studentsWithPayments.filter(s => 
         s.statut_mois_x === 'EXPIRÉ'
       ).length,
-      total_encaisse_mois: studentsWithPayments
-        .filter(s => {
-          // Paiements créés ce mois
-          if (!s.derniere_date_paiement_iso) return false
-          try {
-            const paymentDate = parseISO(s.derniere_date_paiement_iso)
-            return format(paymentDate, 'yyyy-MM') === monthStr
-          } catch {
-            return false
-          }
-        })
-        .reduce((sum, s) => sum + s.montant_dernier_paiement, 0),
+      total_encaisse_mois: Math.round(totalEncaisseMois), // Arrondir pour éviter les décimales
       total_encaisse_historique: studentsWithPayments.reduce(
         (sum, s) => sum + s.montant_total_paye, 0
       ),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, startTransition } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -45,7 +45,11 @@ export function CollaborativeNotificationManager() {
             message: `${userName} a ajouté un étudiant`,
             detail: studentName,
             action: 'Voir',
-            onAction: () => navigate(`/students?highlight=${payload.new.id}`),
+            onAction: () => {
+              startTransition(() => {
+                navigate(`/students?highlight=${payload.new.id}`)
+              })
+            },
             studentId: payload.new.id,
           })
         }
@@ -75,7 +79,11 @@ export function CollaborativeNotificationManager() {
             message: `${userName} a modifié un étudiant`,
             detail: studentName,
             action: 'Voir',
-            onAction: () => navigate(`/students?highlight=${payload.new.id}`),
+            onAction: () => {
+              startTransition(() => {
+                navigate(`/students?highlight=${payload.new.id}`)
+              })
+            },
             studentId: payload.new.id,
           })
         }
@@ -109,7 +117,11 @@ export function CollaborativeNotificationManager() {
             message: `${userName} a enregistré un paiement`,
             detail: `${payload.new.montant_total || 0} FCFA`,
             action: 'Voir',
-            onAction: () => navigate('/payments'),
+            onAction: () => {
+              startTransition(() => {
+                navigate('/payments')
+              })
+            },
           })
         }
       )

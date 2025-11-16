@@ -233,7 +233,7 @@ export default function StudentList() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Filtre ligne */}
             <div>
-              <label className="label">Ligne de bus</label>
+              <label className="label">Ligne de car</label>
               <select
                 value={selectedLine}
                 onChange={(e) => setSelectedLine(e.target.value)}

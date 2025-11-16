@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, startTransition } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -27,12 +27,18 @@ export default function Login() {
       const { error } = await signIn(email, password)
       if (error) throw error
 
-      toast.success('Connexion réussie')
-      navigate('/dashboard')
+      // Afficher le toast et rediriger immédiatement (non bloquant)
+      toast.success('Connexion réussie', { duration: 2000 })
+      
+      // Utiliser startTransition pour les lazy-loaded components (React 18)
+      startTransition(() => {
+        navigate('/dashboard')
+      })
+      
+      // Note: Ne pas réinitialiser loading ici car on navigue
     } catch (error) {
       toast.error(error.message || 'Erreur de connexion')
-    } finally {
-      setLoading(false)
+      setLoading(false) // Réinitialiser seulement en cas d'erreur
     }
   }
 

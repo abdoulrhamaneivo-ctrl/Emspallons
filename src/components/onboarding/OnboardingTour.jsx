@@ -77,7 +77,7 @@ export default function OnboardingTour() {
           content: (
             <div>
               <h3 className="font-bold text-emsp-green mb-2">Liste des étudiants</h3>
-              <p>Vos étudiants apparaissent ici avec leur statut de paiement, classe, ligne de bus...</p>
+              <p>Vos étudiants apparaissent ici avec leur statut de paiement, classe, ligne de car...</p>
             </div>
           ),
           placement: 'top',
@@ -179,20 +179,66 @@ export default function OnboardingTour() {
   const handleJoyrideCallback = (data) => {
     const { status, type, action, index } = data
 
+    // Terminer le guide si terminé ou ignoré
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
       localStorage.setItem(TOUR_STORAGE_KEY, 'true')
       setRun(false)
-    } else if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
-      // Navigation automatique si nécessaire
+      setStepIndex(0)
+      return
+    }
+
+    // Gérer la navigation entre les étapes
+    if (type === EVENTS.STEP_AFTER) {
       if (action === ACTIONS.NEXT) {
+        const nextIndex = index + 1
+        const steps = getSteps()
+        
+        // Vérifier si on est à la dernière étape
+        if (nextIndex >= steps.length) {
+          // C'est la dernière étape, ne rien faire, Joyride terminera
+          return
+        }
+
+        // Navigation automatique vers /students si nécessaire (étape 3 dans le tableau = index 2)
         if (index === 2 && location.pathname !== '/students') {
           navigate('/students')
-          setTimeout(() => setStepIndex(3), 500)
-        } else {
-          setStepIndex(index + 1)
+          // Attendre que la navigation soit complète avant de passer à l'étape suivante
+          setTimeout(() => {
+            setStepIndex(3)
+          }, 600)
+          return
         }
+        
+        // Mettre à jour l'index normalement pour passer à l'étape suivante
+        setStepIndex(nextIndex)
       } else if (action === ACTIONS.PREV) {
-        setStepIndex(index - 1)
+        // Navigation précédente
+        if (index > 0) {
+          const prevIndex = index - 1
+          // Si on revient depuis /students vers le dashboard (étape 3 → étape 2)
+          if (index === 3 && location.pathname === '/students') {
+            navigate('/dashboard')
+            setTimeout(() => {
+              setStepIndex(2)
+            }, 600)
+            return
+          }
+          setStepIndex(prevIndex)
+        }
+      } else if (action === ACTIONS.CLOSE) {
+        // L'utilisateur ferme le guide
+        localStorage.setItem(TOUR_STORAGE_KEY, 'true')
+        setRun(false)
+        setStepIndex(0)
+      }
+    } else if (type === EVENTS.TARGET_NOT_FOUND) {
+      // Si la cible n'est pas trouvée, passer à l'étape suivante
+      if (action === ACTIONS.NEXT) {
+        const nextIndex = index + 1
+        const steps = getSteps()
+        if (nextIndex < steps.length) {
+          setStepIndex(nextIndex)
+        }
       }
     }
   }
@@ -215,15 +261,27 @@ export default function OnboardingTour() {
     return null
   }
 
+  const steps = getSteps()
+
   return (
     <Joyride
-      steps={getSteps()}
+      steps={steps}
       run={run}
       stepIndex={stepIndex}
-      continuous
+      continuous={false}
       showProgress
       showSkipButton
       callback={handleJoyrideCallback}
+      disableOverlayClose={false}
+      disableScrolling={false}
+      locale={{
+        back: 'Précédent',
+        close: 'Fermer',
+        last: 'Terminer',
+        next: 'Suivant',
+        open: 'Ouvrir',
+        skip: 'Passer',
+      }}
       styles={{
         options: {
           primaryColor: '#2D5016',

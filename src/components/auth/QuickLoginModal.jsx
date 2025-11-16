@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, startTransition } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import AnimatedModal from '../ui/AnimatedModal'
@@ -27,14 +27,22 @@ export default function QuickLoginModal({ isOpen, onClose, profile, onSuccess })
       const { error: signInError } = await signIn(profile.email, password)
       if (signInError) throw signInError
 
-      toast.success(`Bienvenue, ${profile.name} !`)
+      // Afficher le toast et naviguer immédiatement (non bloquant)
+      toast.success(`Bienvenue, ${profile.name} !`, { duration: 2000 })
+      
+      // Fermer la modal
       onSuccess()
-      navigate('/dashboard')
+      
+      // Utiliser startTransition pour les lazy-loaded components (React 18)
+      startTransition(() => {
+        navigate('/dashboard')
+      })
+      
+      // Note: Ne pas réinitialiser loading ici car on navigue
     } catch (error) {
       setError(error.message || 'Mot de passe incorrect')
+      setLoading(false) // Réinitialiser seulement en cas d'erreur
       console.error('Login error:', error)
-    } finally {
-      setLoading(false)
     }
   }
 

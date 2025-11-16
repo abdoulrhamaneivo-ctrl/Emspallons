@@ -22,7 +22,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 
 -- ============================================
--- 2. TABLE LINES (Lignes de bus)
+-- 2. TABLE LINES (Lignes de car)
 -- ============================================
 CREATE TABLE IF NOT EXISTS lines (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -607,7 +607,7 @@ GROUP BY statut_paiement;
 -- DONNÉES DE TEST (OPTIONNEL - À SUPPRIMER EN PRODUCTION)
 -- ============================================
 
--- Insérer quelques lignes de bus par défaut
+-- Insérer quelques lignes de car par défaut
 INSERT INTO lines (nom, couleur, active) VALUES
   ('Yopougon', '#FDB913', true),
   ('Angré/Bingerville', '#2D5016', true),

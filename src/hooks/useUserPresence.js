@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import logger from '../lib/logger'
 
 export function useUserPresence() {
   const { user } = useAuth()
@@ -11,24 +12,38 @@ export function useUserPresence() {
     if (!user?.id) return
 
     try {
-      const { error } = await supabase
-        .from('user_presence')
-        .upsert(
-          {
-            user_id: user.id,
-            last_seen: new Date().toISOString(),
-            is_online: true,
-          },
-          {
-            onConflict: 'user_id',
-          }
-        )
+      // Utiliser la fonction RPC sécurisée pour éviter les problèmes RLS avec upsert
+      const { error } = await supabase.rpc('upsert_user_presence', {
+        p_user_id: user.id,
+        p_is_online: true
+      })
 
       if (error) {
-        console.error('Erreur mise à jour présence:', error)
+        // Fallback : essayer upsert direct si la fonction RPC n'est pas disponible
+        if (error.code === '42883' || error.message.includes('does not exist')) {
+          logger.debug('Fonction RPC non disponible, utilisation upsert direct', error)
+          const { error: upsertError } = await supabase
+            .from('user_presence')
+            .upsert(
+              {
+                user_id: user.id,
+                last_seen: new Date().toISOString(),
+                is_online: true,
+              },
+              {
+                onConflict: 'user_id',
+              }
+            )
+          
+          if (upsertError) {
+            logger.error('Erreur mise à jour présence (upsert direct)', upsertError)
+          }
+        } else {
+          logger.error('Erreur mise à jour présence', error)
+        }
       }
     } catch (err) {
-      console.error('Erreur présence:', err)
+      logger.error('Erreur présence', err)
     }
   }
 
@@ -45,7 +60,7 @@ export function useUserPresence() {
         })
         .eq('user_id', user.id)
     } catch (err) {
-      console.error('Erreur marquage hors ligne:', err)
+      logger.error('Erreur marquage hors ligne', err)
     }
   }
 

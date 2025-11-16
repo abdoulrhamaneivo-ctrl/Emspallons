@@ -1,5 +1,6 @@
 // DOIT ÊTRE LA PREMIÈRE IMPORT !
 import './lib/env'
+import './lib/consolePatch'
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'

@@ -64,16 +64,36 @@ export const verifyPassword = async (password, hash) => {
   }
 }
 
+// Cache pour les contrôleurs (évite les requêtes répétées pour le même code)
+let controllerCache = new Map()
+const CONTROLLER_CACHE_DURATION = 10 * 60 * 1000 // 10 minutes
+
 /**
- * Authentifie un contrôleur
+ * Authentifie un contrôleur (optimisé avec cache)
  */
 export const loginController = async (code, password) => {
   try {
-    // 1. Récupérer le contrôleur par code
+    // Vérifier le cache d'abord (si la session est récente)
+    const cacheKey = `${code}_${password.substring(0, 4)}` // Cache partiel du mot de passe
+    const cached = controllerCache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < CONTROLLER_CACHE_DURATION) {
+      // Vérifier quand même le mot de passe complet
+      const isValid = await verifyPassword(password, cached.password_hash)
+      if (isValid) {
+        return cached.controllerData
+      }
+    }
+
+    // 1. Récupérer le contrôleur par code (optimisé : seulement les champs nécessaires)
     const { data: controller, error: controllerError } = await supabase
       .from('controllers')
       .select(`
-        *,
+        id,
+        nom,
+        code,
+        ligne_id,
+        password_hash,
+        active,
         lines:ligne_id (
           id,
           nom,
@@ -82,9 +102,13 @@ export const loginController = async (code, password) => {
       `)
       .eq('code', code)
       .eq('active', true)
-      .single()
+      .maybeSingle() // Utiliser maybeSingle pour éviter erreur si non trouvé
 
-    if (controllerError || !controller) {
+    if (controllerError) {
+      throw new Error('Erreur lors de la vérification du contrôleur')
+    }
+
+    if (!controller) {
       throw new Error('Code contrôleur invalide ou contrôleur inactif')
     }
 
@@ -103,8 +127,8 @@ export const loginController = async (code, password) => {
       throw new Error('Mot de passe incorrect')
     }
 
-    // 4. Retourner les données de session
-    return {
+    // 4. Préparer les données de session
+    const controllerData = {
       id: controller.id,
       name: controller.nom,
       code: controller.code,
@@ -112,6 +136,25 @@ export const loginController = async (code, password) => {
       line_name: controller.lines?.nom || '',
       line_color: controller.lines?.couleur || '#7CB342',
     }
+
+    // Mettre en cache (avec hash du mot de passe pour vérification ultérieure)
+    controllerCache.set(cacheKey, {
+      controllerData,
+      password_hash: controller.password_hash,
+      timestamp: Date.now()
+    })
+
+    // Nettoyer le cache ancien si trop d'entrées
+    if (controllerCache.size > 20) {
+      const now = Date.now()
+      for (const [key, value] of controllerCache.entries()) {
+        if (now - value.timestamp > CONTROLLER_CACHE_DURATION) {
+          controllerCache.delete(key)
+        }
+      }
+    }
+
+    return controllerData
   } catch (error) {
     console.error('Error logging in controller:', error)
     throw error

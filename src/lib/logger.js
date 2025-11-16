@@ -8,6 +8,21 @@
 const isDev = import.meta.env.DEV
 const isProduction = import.meta.env.PROD
 
+// Conserver une référence vers la console d'origine (avant patch)
+const globalConsole = (() => {
+  if (typeof window !== 'undefined') {
+    return window.__ORIGINAL_CONSOLE__ || window.console
+  }
+  return console
+})()
+
+const originalConsole = {
+  log: globalConsole?.log ? globalConsole.log.bind(globalConsole) : () => {},
+  info: globalConsole?.info ? globalConsole.info.bind(globalConsole) : () => {},
+  warn: globalConsole?.warn ? globalConsole.warn.bind(globalConsole) : () => {},
+  error: globalConsole?.error ? globalConsole.error.bind(globalConsole) : () => {},
+}
+
 // Niveaux de log
 const LogLevel = {
   DEBUG: 'debug',
@@ -62,7 +77,7 @@ class Logger {
     this.storeLog(logEntry)
 
     if (isDev) {
-      console.log(`%c[DEBUG] ${message}`, colors.debug, data || '')
+      originalConsole.log(`%c[DEBUG] ${message}`, colors.debug, data || '')
     }
   }
 
@@ -74,7 +89,7 @@ class Logger {
     this.storeLog(logEntry)
 
     if (isDev) {
-      console.log(`%c[INFO] ${message}`, colors.info, data || '')
+      originalConsole.log(`%c[INFO] ${message}`, colors.info, data || '')
     }
   }
 
@@ -86,10 +101,10 @@ class Logger {
     this.storeLog(logEntry)
 
     if (isDev) {
-      console.warn(`%c[WARN] ${message}`, colors.warn, data || '')
+      originalConsole.warn(`%c[WARN] ${message}`, colors.warn, data || '')
     } else {
       // En production, logger les warnings importants
-      console.warn(`[WARN] ${message}`)
+      originalConsole.warn(`[WARN] ${message}`)
     }
   }
 
@@ -105,7 +120,7 @@ class Logger {
     this.storeLog(logEntry)
 
     // Toujours logger les erreurs
-    console.error(`[ERROR] ${message}`, {
+    originalConsole.error(`[ERROR] ${message}`, {
       error,
       data,
       timestamp: logEntry.timestamp

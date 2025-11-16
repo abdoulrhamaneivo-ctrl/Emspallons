@@ -91,7 +91,7 @@ La carte contient :
   - Nom et prénom
   - Classe et niveau
   - Numéro d'étudiant
-  - Ligne de bus
+  - Ligne de car
   - Point de ramassage
 
 - **Verso (Face arrière) :**
@@ -147,7 +147,7 @@ La carte contient :
    - Identité de l'étudiant
    - Validité du QR code
    - Statut de paiement
-   - Ligne de bus
+   - Ligne de car
 4. ✅ Reçoit une réponse immédiate :
    - ✅ Vert = Accès autorisé
    - ⚠️ Orange = Avertissement (en retard)

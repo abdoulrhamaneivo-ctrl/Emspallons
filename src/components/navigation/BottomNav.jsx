@@ -6,8 +6,12 @@ import { useAuth } from '../../context/AuthContext'
 
 export default function BottomNav() {
   const location = useLocation()
-  const { role } = useAuth()
+  const { role, user } = useAuth()
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+
+  if (!user) {
+    return null
+  }
 
   const isActive = (path) => {
     if (path === '/dashboard') {
@@ -115,7 +119,7 @@ export default function BottomNav() {
               <div className="p-4">
                 <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-emsp-green mb-4 px-4">
-                  Plus d'options
+                  Plus d&apos;options
                 </h3>
                 <div className="space-y-2">
                   {moreItems.map((item) => (

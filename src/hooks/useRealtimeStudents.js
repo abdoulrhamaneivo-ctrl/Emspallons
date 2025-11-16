@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { CACHE_KEYS, getCache, setCache } from '../lib/dataCache'
+import logger from '../lib/logger'
+
+const STUDENTS_CACHE_TTL = 5 * 60 * 1000
 
 export function useRealtimeStudents() {
   const [students, setStudents] = useState([])
@@ -8,6 +12,14 @@ export function useRealtimeStudents() {
   const debounceTimerRef = useRef(null)
   const notificationQueueRef = useRef([])
   const isUserActiveRef = useRef(true)
+
+  const updateStudentsState = useCallback((updater) => {
+    setStudents((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      setCache(CACHE_KEYS.STUDENTS, next, STUDENTS_CACHE_TTL)
+      return next
+    })
+  }, [])
 
   // Vérifier si l'utilisateur est actif
   useEffect(() => {
@@ -70,14 +82,27 @@ export function useRealtimeStudents() {
     }, 500)
   }, [processNotificationQueue])
 
-  // Chargement initial
+  // Chargement initial (optimisé : limite initiale, chargement progressif)
   const fetchInitial = useCallback(async () => {
     try {
       setLoading(true)
+      // Limiter à 100 étudiants initialement pour charger plus vite
+      // Les autres seront chargés progressivement si nécessaire
       const { data, error } = await supabase
         .from('students')
         .select(`
-          *,
+          id,
+          nom,
+          prenom,
+          classe,
+          niveau,
+          contact,
+          statut_paiement,
+          months_ledger,
+          ligne_id,
+          qr_code_token,
+          qr_code_status,
+          created_at,
           lines:ligne_id (
             id,
             nom,
@@ -85,18 +110,63 @@ export function useRealtimeStudents() {
           )
         `)
         .order('created_at', { ascending: false })
+        .limit(100) // Limite initiale pour charger plus vite
 
       if (error) throw error
-      setStudents(data || [])
+      updateStudentsState(data || [])
+      
+      // Si plus de 100 étudiants, charger le reste en arrière-plan (non bloquant)
+      const { count } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+      
+      if (count && count > 100) {
+        // Charger le reste progressivement
+        setTimeout(async () => {
+          const { data: remainingData } = await supabase
+            .from('students')
+            .select(`
+              id,
+              nom,
+              prenom,
+              classe,
+              niveau,
+              contact,
+              statut_paiement,
+              months_ledger,
+              ligne_id,
+              qr_code_token,
+              qr_code_status,
+              created_at,
+              lines:ligne_id (
+                id,
+                nom,
+                couleur
+              )
+            `)
+            .order('created_at', { ascending: false })
+            .range(100, count - 1)
+          
+          if (remainingData) {
+            updateStudentsState(prev => [...prev, ...remainingData])
+          }
+        }, 500) // Charger après 500ms pour ne pas bloquer
+      }
     } catch (err) {
-      console.error('Erreur chargement étudiants:', err)
+      logger.error('Erreur chargement étudiants', err)
       toast.error('Erreur lors du chargement des étudiants')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [updateStudentsState])
 
   useEffect(() => {
+    const cached = getCache(CACHE_KEYS.STUDENTS, STUDENTS_CACHE_TTL)
+    if (cached?.length) {
+      updateStudentsState(cached)
+      setLoading(false)
+    }
+
     fetchInitial()
 
     // Écoute des changements en temps réel
@@ -127,8 +197,7 @@ export function useRealtimeStudents() {
             .single()
           
           if (fullStudent) {
-            setStudents((prev) => {
-              // Vérifier si l'étudiant n'existe pas déjà
+            updateStudentsState((prev) => {
               if (prev.find(s => s.id === fullStudent.id)) {
                 return prev
               }
@@ -163,7 +232,7 @@ export function useRealtimeStudents() {
             .single()
           
           if (fullStudent) {
-            setStudents((prev) =>
+            updateStudentsState((prev) =>
               prev.map((s) => (s.id === fullStudent.id ? fullStudent : s))
             )
             
@@ -180,15 +249,15 @@ export function useRealtimeStudents() {
           table: 'students',
         },
         (payload) => {
-          setStudents((prev) => prev.filter((s) => s.id !== payload.old.id))
+          updateStudentsState((prev) => prev.filter((s) => s.id !== payload.old.id))
           debouncedNotification('warning', `Étudiant supprimé`)
         }
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Abonnement temps réel étudiants actif')
+          logger.info('✅ Abonnement temps réel étudiants actif')
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Erreur abonnement temps réel étudiants')
+          logger.error('❌ Erreur abonnement temps réel étudiants', null, { status })
         }
       })
 
@@ -198,7 +267,7 @@ export function useRealtimeStudents() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [fetchInitial, debouncedNotification])
+  }, [fetchInitial, debouncedNotification, updateStudentsState])
 
   return { students, loading }
 }

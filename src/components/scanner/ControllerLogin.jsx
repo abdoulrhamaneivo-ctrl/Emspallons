@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { loginController } from '../../lib/controllerAuth'
 import { FloatingShapes, GradientOrb } from '../ui/DecorativeElements'
@@ -20,23 +20,28 @@ export default function ControllerLogin({ onLoginSuccess }) {
     try {
       const controllerData = await loginController(code, password)
 
-      // Stocker la session
+      // Stocker la session immédiatement (non bloquant)
       sessionStorage.setItem('controller_session', JSON.stringify({
         controller_session: controllerData,
       }))
 
-      toast.success('Connexion réussie')
+      // Afficher le toast et continuer immédiatement
+      toast.success('Connexion réussie', { duration: 2000 })
       
       if (onLoginSuccess) {
+        // Appeler le callback sans attendre
         onLoginSuccess(controllerData)
       } else {
-        // Redirection vers le scanner
-        navigate('/scan')
+        // Utiliser startTransition pour les lazy-loaded components (React 18)
+        startTransition(() => {
+          navigate('/scan')
+        })
       }
+      
+      // Note: Ne pas réinitialiser loading ici car on navigue
     } catch (error) {
       toast.error(error.message || 'Erreur de connexion')
-    } finally {
-      setLoading(false)
+      setLoading(false) // Réinitialiser seulement en cas d'erreur
     }
   }
 

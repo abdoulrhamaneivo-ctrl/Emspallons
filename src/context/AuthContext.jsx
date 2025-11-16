@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, getUserRole, getUserProfile } from '../lib/supabase'
+/* eslint-disable react-refresh/only-export-components */
+import { supabase, getUserProfileWithRole } from '../lib/supabase'
 import { ROLES } from '../lib/constants'
 import { addRecentProfile } from '../lib/recentProfiles'
 import logger from '../lib/logger'
@@ -26,24 +27,21 @@ export const AuthProvider = ({ children }) => {
     let timeoutId = null
     let sessionLoaded = false
 
-    // Timeout de sécurité pour éviter le blocage
+    // Timeout de sécurité pour éviter le blocage (réduit à 1 seconde)
     timeoutId = setTimeout(() => {
       if (mounted && !sessionLoaded) {
         logger.warn('Auth loading timeout - forcing loading to false')
         setLoading(false)
       }
-    }, 3000) // 3 secondes max
+    }, 1000) // 1 seconde max pour une réponse plus rapide
 
-    // Fonction pour charger le profil utilisateur
+    // Fonction optimisée pour charger le profil utilisateur (une seule requête)
     const loadUserProfile = async (userId) => {
       if (!userId) return { role: null, profile: null }
       
       try {
-        const [userRole, userProfile] = await Promise.all([
-          getUserRole(userId),
-          getUserProfile(userId),
-        ])
-        return { role: userRole, profile: userProfile }
+        // Utiliser getUserProfileWithRole pour une seule requête au lieu de deux
+        return await getUserProfileWithRole(userId)
       } catch (error) {
         logger.error('Error loading user profile', error, { userId })
         return { role: null, profile: null }
@@ -103,26 +101,39 @@ export const AuthProvider = ({ children }) => {
 
     // Écouter les changements d'authentification (seulement après le chargement initial)
     try {
+      let lastUserId = null // Pour éviter les chargements redondants
       const {
         data: { subscription: sub },
-      } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (!mounted) return
         
         // Ignorer le premier événement (déjà géré par getSession)
         if (!sessionLoaded) return
         
+        // Éviter les chargements redondants si l'utilisateur n'a pas changé
+        const currentUserId = session?.user?.id
+        if (currentUserId === lastUserId && event !== 'SIGNED_OUT') {
+          logger.debug('Skipping redundant auth state change', { event, userId: currentUserId })
+          return
+        }
+        lastUserId = currentUserId
+        
         try {
           setUser(session?.user ?? null)
           if (session?.user) {
-            const { role: userRole, profile: userProfile } = await loadUserProfile(session.user.id)
-            if (mounted) {
-              setRole(userRole)
-              setProfile(userProfile)
+            // Charger le profil seulement si nécessaire (éviter le double chargement après signIn)
+            if (role === null || profile === null || user?.id !== session.user.id) {
+              const { role: userRole, profile: userProfile } = await loadUserProfile(session.user.id)
+              if (mounted) {
+                setRole(userRole)
+                setProfile(userProfile)
+              }
             }
           } else {
             if (mounted) {
               setRole(null)
               setProfile(null)
+              lastUserId = null
             }
           }
         } catch (error) {
@@ -131,6 +142,7 @@ export const AuthProvider = ({ children }) => {
             setUser(null)
             setRole(null)
             setProfile(null)
+            lastUserId = null
           }
         }
       })
@@ -146,7 +158,15 @@ export const AuthProvider = ({ children }) => {
         subscription.unsubscribe()
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!user?.id) return
+    import('../services/prefetchService')
+      .then(({ prefetchCriticalData }) => prefetchCriticalData())
+      .catch(() => {})
+  }, [user?.id])
 
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -154,28 +174,52 @@ export const AuthProvider = ({ children }) => {
       password,
     })
     if (error) throw error
+    
+    // Mettre à jour l'utilisateur immédiatement
     if (data.user) {
-      const userRole = await getUserRole(data.user.id)
-      const userProfile = await getUserProfile(data.user.id)
-      setRole(userRole)
-      setProfile(userProfile)
+      setUser(data.user)
       
-      // Sauvegarder le profil dans les profils récents
-      if (userProfile) {
-        addRecentProfile({
-          id: data.user.id,
-          name: userProfile.nom || email,
-          email: email,
-          role: userRole || 'educator',
+      // Charger le profil de manière PRIORITAIRE (sans attendre mais avec priorité)
+      // Utiliser getUserProfileWithRole pour une seule requête optimisée
+      getUserProfileWithRole(data.user.id)
+        .then(({ role: userRole, profile: userProfile }) => {
+          setRole(userRole)
+          setProfile(userProfile)
+          
+          // Sauvegarder le profil dans les profils récents
+          if (userProfile) {
+            try {
+              addRecentProfile({
+                id: data.user.id,
+                name: userProfile.nom || email,
+                email: email,
+                role: userRole || 'educator',
+              })
+            } catch (err) {
+              logger.debug('Error adding to recent profiles', err)
+            }
+          }
+          
+          logger.debug('Profile loaded after signIn', { userId: data.user.id, role: userRole })
         })
-      }
+        .catch((err) => {
+          logger.error('Error loading profile after signIn', err)
+        })
     }
+    
     return { data, error }
   }
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
+    
+    // Invalider le cache du profil lors de la déconnexion
+    if (user?.id) {
+      const { invalidateProfileCache } = await import('../lib/supabase')
+      invalidateProfileCache(user.id)
+    }
+    
     setUser(null)
     setRole(null)
     setProfile(null)

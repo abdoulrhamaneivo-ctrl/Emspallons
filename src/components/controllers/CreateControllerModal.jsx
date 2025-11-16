@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Eye, EyeOff, Copy, Check, RefreshCw, X } from 'lucide-react'
+import { Eye, EyeOff, Copy, RefreshCw } from 'lucide-react'
 import AnimatedModal from '../ui/AnimatedModal'
 import AnimatedButton from '../ui/AnimatedButton'
 import { Input, Select } from '../ui'
 import { hashPassword, generateControllerCode, generateSecurePassword } from '../../lib/controllerAuth'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import logger from '../../lib/logger'
 
 export default function CreateControllerModal({ isOpen, onClose, onSuccess, lines }) {
   const { user } = useAuth()
@@ -62,11 +63,15 @@ export default function CreateControllerModal({ isOpen, onClose, onSuccess, line
     setLoading(true)
     try {
       // Vérifier si le code existe déjà
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('controllers')
         .select('id')
         .eq('code', formData.code.toUpperCase().trim())
-        .single()
+        .maybeSingle()
+
+      if (existingError && existingError.code !== 'PGRST116') {
+        throw existingError
+      }
 
       if (existing) {
         setErrors({ code: 'Ce code existe déjà' })
@@ -121,7 +126,7 @@ export default function CreateControllerModal({ isOpen, onClose, onSuccess, line
       toast.success('Contrôleur créé avec succès !')
     } catch (error) {
       toast.error(error.message || 'Erreur lors de la création')
-      console.error(error)
+      logger.error('Erreur création contrôleur', error)
     } finally {
       setLoading(false)
     }

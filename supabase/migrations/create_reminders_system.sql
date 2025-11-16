@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS reminders_config (
 CREATE INDEX IF NOT EXISTS idx_reminders_config_active ON reminders_config(active);
 CREATE INDEX IF NOT EXISTS idx_reminders_config_name ON reminders_config(name);
 
+-- Activer RLS sur reminders_history
+ALTER TABLE IF EXISTS reminders_history ENABLE ROW LEVEL SECURITY;
+
+-- Activer RLS sur reminders_config
+ALTER TABLE IF EXISTS reminders_config ENABLE ROW LEVEL SECURITY;
+
 -- RLS Policies pour reminders_history
 DROP POLICY IF EXISTS "Admins and educators can view reminders history" ON reminders_history;
 DROP POLICY IF EXISTS "Admins and educators can create reminders history" ON reminders_history;

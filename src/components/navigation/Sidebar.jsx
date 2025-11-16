@@ -1,11 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { 
-  Home, GraduationCap, DollarSign, FileText, Bell, 
-  History, Settings, HelpCircle, User, LogOut, Menu, X, Play
+import {
+  Home, GraduationCap, DollarSign, FileText, Bell,
+  History, Settings, HelpCircle, User, LogOut, X, Play, BarChart3
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
-import { useState } from 'react'
+import { startTransition } from 'react'
 import toast from 'react-hot-toast'
 import Logo from '../ui/Logo'
 
@@ -13,7 +13,10 @@ export default function Sidebar({ isOpen, onClose, isTablet }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, role, signOut } = useAuth()
-  const [showMobileMenu, setShowMobileMenu] = useState(false)
+
+  if (!user) {
+    return null
+  }
 
   const isActive = (path) => {
     if (path === '/dashboard') {
@@ -26,8 +29,11 @@ export default function Sidebar({ isOpen, onClose, isTablet }) {
     try {
       await signOut()
       toast.success('Déconnexion réussie')
+      // Utiliser startTransition pour les lazy-loaded components (React 18)
       setTimeout(() => {
-        navigate('/login')
+        startTransition(() => {
+          navigate('/login')
+        })
       }, 500)
     } catch (error) {
       toast.error('Erreur lors de la déconnexion')
@@ -41,6 +47,7 @@ export default function Sidebar({ isOpen, onClose, isTablet }) {
           { path: '/students', label: 'Étudiants', icon: GraduationCap },
           { path: '/payments', label: 'Paiements', icon: DollarSign },
           { path: '/rapports', label: 'Rapports', icon: FileText },
+          { path: '/bilan-mensuel', label: 'Bilan mensuel', icon: BarChart3 },
           { path: '/rappels', label: 'Rappels', icon: Bell },
           { path: '/admin/scan-history', label: 'Historique Scans', icon: History },
           { path: '/admin', label: 'Administration', icon: Settings },

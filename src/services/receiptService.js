@@ -164,7 +164,7 @@ export const generateReceiptPDF = async (payment, student) => {
     ['Nom complet', `${student.nom} ${student.prenom || ''}`.trim()],
     ['Classe', student.classe || 'N/A'],
     ['Niveau', student.niveau || 'N/A'],
-    ['Ligne de bus', student.lines?.nom || 'N/A'],
+    ['Ligne de car', student.lines?.nom || 'N/A'],
   ]
 
   autoTable(doc, {

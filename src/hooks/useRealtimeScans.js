@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import { CACHE_KEYS, getCache, setCache } from '../lib/dataCache'
+import logger from '../lib/logger'
+
+const SCANS_CACHE_TTL = 60 * 1000 // 1 minute
 
 export function useRealtimeScans() {
   const [scans, setScans] = useState([])
@@ -9,6 +13,14 @@ export function useRealtimeScans() {
   const debounceTimerRef = useRef(null)
   const notificationQueueRef = useRef([])
   const isUserActiveRef = useRef(true)
+
+  const updateScansState = useCallback((updater) => {
+    setScans((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      setCache(CACHE_KEYS.SCANS, next, SCANS_CACHE_TTL)
+      return next
+    })
+  }, [])
 
   // Vérifier si l'utilisateur est actif
   useEffect(() => {
@@ -91,17 +103,24 @@ export function useRealtimeScans() {
         .limit(100)
 
       if (error) throw error
-      setScans(data || [])
+      updateScansState(data || [])
       setScanCount(data?.length || 0)
     } catch (err) {
-      console.error('Erreur chargement scans:', err)
+      logger.error('Erreur chargement scans', err)
       toast.error('Erreur lors du chargement des scans')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [updateScansState])
 
   useEffect(() => {
+    const cached = getCache(CACHE_KEYS.SCANS, SCANS_CACHE_TTL)
+    if (cached?.length) {
+      updateScansState(cached)
+      setScanCount(cached.length)
+      setLoading(false)
+    }
+
     fetchInitial()
 
     // Écoute des changements en temps réel
@@ -136,13 +155,12 @@ export function useRealtimeScans() {
           const student = studentData.data
           const controller = controllerData.data
           const studentName = student ? `${student.nom} ${student.prenom || ''}`.trim() : 'Étudiant'
-          const controllerName = controller?.nom || 'Contrôleur'
 
-          setScans((prev) => {
+          updateScansState((prev) => {
             if (prev.find(s => s.id === newScan.id)) {
               return prev
             }
-            return [
+            const updated = [
               {
                 ...newScan,
                 students: student,
@@ -150,8 +168,9 @@ export function useRealtimeScans() {
               },
               ...prev,
             ]
+            setScanCount(updated.length)
+            return updated
           })
-          setScanCount((prev) => prev + 1)
 
           // Notification selon le statut
           const statusMessages = {
@@ -173,7 +192,7 @@ export function useRealtimeScans() {
           table: 'scan_logs',
         },
         (payload) => {
-          setScans((prev) =>
+          updateScansState((prev) =>
             prev.map((s) => (s.id === payload.new.id ? payload.new : s))
           )
         }
@@ -186,15 +205,18 @@ export function useRealtimeScans() {
           table: 'scan_logs',
         },
         (payload) => {
-          setScans((prev) => prev.filter((s) => s.id !== payload.old.id))
-          setScanCount((prev) => Math.max(0, prev - 1))
+          updateScansState((prev) => {
+            const filtered = prev.filter((s) => s.id !== payload.old.id)
+            setScanCount(filtered.length)
+            return filtered
+          })
         }
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Abonnement temps réel scans actif')
+          logger.info('✅ Abonnement temps réel scans actif')
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Erreur abonnement temps réel scans')
+          logger.error('❌ Erreur abonnement temps réel scans', null, { status })
         }
       })
 
@@ -204,7 +226,7 @@ export function useRealtimeScans() {
         clearTimeout(debounceTimerRef.current)
       }
     }
-  }, [fetchInitial, debouncedNotification])
+  }, [fetchInitial, debouncedNotification, updateScansState])
 
   return { scans, loading, scanCount }
 }

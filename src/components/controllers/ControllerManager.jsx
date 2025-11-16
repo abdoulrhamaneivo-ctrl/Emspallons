@@ -7,6 +7,7 @@ import ResetControllerPasswordModal from './ResetControllerPasswordModal'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES } from '../../lib/constants'
+import logger from '../../lib/logger'
 
 export default function ControllerManager() {
   const { isAdmin, role, user } = useAuth()
@@ -51,7 +52,7 @@ export default function ControllerManager() {
       setControllers(data || [])
     } catch (error) {
       toast.error('Erreur lors du chargement des contrôleurs')
-      console.error(error)
+      logger.error('Erreur chargement contrôleurs', error)
     } finally {
       setLoading(false)
     }
@@ -67,7 +68,7 @@ export default function ControllerManager() {
 
       if (data) setLines(data)
     } catch (error) {
-      console.error('Error fetching lines:', error)
+      logger.error('Erreur chargement lignes', error)
     }
   }
 
@@ -122,6 +123,7 @@ export default function ControllerManager() {
       const dataToSubmit = {
         ...formData,
         code: formData.code.toUpperCase().trim(),
+        ...(editingController ? {} : { created_by: user?.id || null }),
       }
 
       if (editingController) {
@@ -134,11 +136,15 @@ export default function ControllerManager() {
         toast.success('Contrôleur mis à jour')
       } else {
         // Vérifier si le code existe déjà
-        const { data: existing } = await supabase
+        const { data: existing, error: existingError } = await supabase
           .from('controllers')
           .select('id')
           .eq('code', dataToSubmit.code)
-          .single()
+          .maybeSingle()
+
+        if (existingError && existingError.code !== 'PGRST116') {
+          throw existingError
+        }
 
         if (existing) {
           setErrors({ code: 'Ce code existe déjà' })
@@ -160,7 +166,7 @@ export default function ControllerManager() {
       fetchControllers()
     } catch (error) {
       toast.error(error.message || 'Erreur lors de l\'enregistrement')
-      console.error(error)
+      logger.error('Erreur enregistrement contrôleur', error)
     }
   }
 
@@ -189,7 +195,7 @@ export default function ControllerManager() {
       fetchControllers()
     } catch (error) {
       toast.error(error.message || 'Erreur lors de la suppression')
-      console.error(error)
+      logger.error('Erreur suppression contrôleur', error)
     }
   }
 

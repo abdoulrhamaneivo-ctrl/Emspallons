@@ -268,7 +268,7 @@ export default function StudentForm({ student, onClose, onSuccess }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Ligne */}
             <Select
-              label="Ligne de bus *"
+              label="Ligne de car *"
               value={formData.ligne_id}
               onChange={(e) => handleChange('ligne_id', e.target.value)}
               error={errors.ligne_id}

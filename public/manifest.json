@@ -1,7 +1,7 @@
 {
-  "name": "EMSP Transport Management",
-  "short_name": "EMSP Allons",
-  "description": "Plateforme de gestion transport scolaire EMSP",
+  "name": "EMSP Transport Car Scolaire",
+  "short_name": "EMSP Cars",
+  "description": "Plateforme de gestion de transport scolaire par car EMSP",
   "theme_color": "#FDB913",
   "background_color": "#2D5016",
   "display": "standalone",

@@ -1,44 +1,144 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { genererCodeQR } from '../lib/utils'
+import logger from '../lib/logger'
+import { CACHE_KEYS, getCache, setCache } from '../lib/dataCache'
+
+const STUDENTS_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 export const useStudents = () => {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const linesCacheRef = useRef(new Map())
+  const mountedRef = useRef(true)
 
-  const fetchStudents = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const { data, error: fetchError } = await supabase
-        .from('students')
-        .select(`
-          *,
-          lines:ligne_id (
-            id,
-            nom,
-            couleur
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (fetchError) throw fetchError
-      setStudents(data || [])
-    } catch (err) {
-      setError(err.message)
-      toast.error('Erreur lors du chargement des étudiants')
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+  const updateStudentsState = useCallback((updater) => {
+    setStudents((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      setCache(CACHE_KEYS.STUDENTS, next, STUDENTS_CACHE_TTL)
+      return next
+    })
   }, [])
 
-  useEffect(() => {
-    fetchStudents()
+  const enrichStudentWithLine = useCallback(
+    async (student) => {
+      if (!student) return student
+      if (student.lines) return student
+      if (!student.ligne_id) {
+        return { ...student, lines: null }
+      }
 
-    // Subscription en temps réel
+      const cachedLine = linesCacheRef.current.get(student.ligne_id)
+      if (cachedLine) {
+        return { ...student, lines: cachedLine }
+      }
+
+      try {
+        const { data, error: lineError } = await supabase
+          .from('lines')
+          .select('id, nom, couleur')
+          .eq('id', student.ligne_id)
+          .maybeSingle()
+
+        if (lineError) throw lineError
+        if (data) {
+          linesCacheRef.current.set(student.ligne_id, data)
+          return { ...student, lines: data }
+        }
+      } catch (err) {
+        logger.warn('Impossible de récupérer la ligne associée', {
+          studentId: student.id,
+          ligneId: student.ligne_id,
+          error: err?.message,
+        })
+      }
+
+      return { ...student, lines: null }
+    },
+    []
+  )
+
+  const fetchStudents = useCallback(
+    async ({ showLoader = true } = {}) => {
+      try {
+        if (showLoader && mountedRef.current) {
+          setLoading(true)
+        }
+        setError(null)
+        const { data, error: fetchError } = await supabase
+          .from('students')
+          .select(`
+            *,
+            lines:ligne_id (
+              id,
+              nom,
+              couleur
+            )
+          `)
+          .order('created_at', { ascending: false })
+
+        if (fetchError) throw fetchError
+        if (mountedRef.current) {
+          updateStudentsState(data || [])
+        }
+      } catch (err) {
+        if (mountedRef.current) {
+          setError(err.message)
+          toast.error('Erreur lors du chargement des étudiants')
+        }
+        logger.error('Erreur lors du chargement des étudiants', err)
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false)
+        }
+      }
+    },
+    [updateStudentsState]
+  )
+
+  const handleRealtimeChange = useCallback(
+    async (payload) => {
+      if (!payload || !mountedRef.current) return
+
+      const { eventType, new: newStudent, old: oldStudent } = payload
+
+      try {
+        if (eventType === 'INSERT') {
+          const enriched = await enrichStudentWithLine(newStudent)
+          updateStudentsState((prev) => {
+            if (prev.some((student) => student.id === enriched.id)) {
+              return prev.map((student) => (student.id === enriched.id ? enriched : student))
+            }
+            return [enriched, ...prev]
+          })
+        } else if (eventType === 'UPDATE') {
+            const enriched = await enrichStudentWithLine(newStudent)
+            updateStudentsState((prev) =>
+            prev.map((student) => (student.id === enriched.id ? enriched : student))
+          )
+        } else if (eventType === 'DELETE' && oldStudent?.id) {
+            updateStudentsState((prev) => prev.filter((student) => student.id !== oldStudent.id))
+        }
+      } catch (err) {
+        logger.error('Erreur lors du traitement temps réel des étudiants', err)
+      }
+    },
+    [enrichStudentWithLine, updateStudentsState]
+  )
+
+  useEffect(() => {
+    mountedRef.current = true
+
+      const cached = getCache(CACHE_KEYS.STUDENTS, STUDENTS_CACHE_TTL)
+      if (cached?.length) {
+        updateStudentsState(cached)
+        setLoading(false)
+      }
+
+    fetchStudents({ showLoader: !(cached?.length) })
+
     const subscription = supabase
       .channel('students_changes')
       .on(
@@ -49,16 +149,16 @@ export const useStudents = () => {
           table: 'students',
         },
         (payload) => {
-          console.log('Change received!', payload)
-          fetchStudents() // Recharger les données
+          handleRealtimeChange(payload)
         }
       )
       .subscribe()
 
     return () => {
+      mountedRef.current = false
       subscription.unsubscribe()
     }
-  }, [fetchStudents])
+    }, [fetchStudents, handleRealtimeChange, updateStudentsState])
 
   const createStudent = async (studentData) => {
     try {
@@ -88,7 +188,7 @@ export const useStudents = () => {
       if (createError) throw createError
       
       // Le trigger mettra à jour automatiquement le statut_paiement
-      setStudents((prev) => [data, ...prev])
+      updateStudentsState((prev) => [data, ...prev])
       toast.success('Étudiant créé avec succès')
       return { data, error: null }
     } catch (err) {
@@ -114,7 +214,7 @@ export const useStudents = () => {
         .single()
 
       if (updateError) throw updateError
-      setStudents((prev) =>
+      updateStudentsState((prev) =>
         prev.map((student) => (student.id === id ? data : student))
       )
       toast.success('Étudiant mis à jour avec succès')
@@ -133,7 +233,7 @@ export const useStudents = () => {
         .eq('id', id)
 
       if (deleteError) throw deleteError
-      setStudents((prev) => prev.filter((student) => student.id !== id))
+      updateStudentsState((prev) => prev.filter((student) => student.id !== id))
       toast.success('Étudiant supprimé avec succès')
       return { error: null }
     } catch (err) {

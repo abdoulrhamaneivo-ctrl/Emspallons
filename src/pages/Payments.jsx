@@ -16,6 +16,7 @@ import SelectStudentModal from '../components/payments/SelectStudentModal'
 import ReceiptPreviewModal from '../components/payments/ReceiptPreviewModal'
 import { useStudents } from '../hooks/useStudents'
 import { generateReceiptPDF, downloadReceipt } from '../services/receiptService'
+import { formatDate } from '../lib/utils'
 
 export default function Payments() {
   const location = useLocation()
@@ -204,11 +205,7 @@ export default function Payments() {
                           {payment.students?.nom || ''} {payment.students?.prenom || ''}
                         </p>
                         <p className="text-sm text-gray-600 mt-1">
-                          {new Date(payment.created_at).toLocaleDateString('fr-FR', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric',
-                          })}
+                          {formatDate(payment.created_at, 'd MMMM yyyy')}
                         </p>
                         {payment.nombre_mois && (
                           <p className="text-xs text-gray-500 mt-1">
@@ -222,9 +219,9 @@ export default function Payments() {
                         </p>
                         <div className="mt-2 flex items-center justify-end space-x-2">
                           <AnimatedBadge
-                            variant={payment.status === 'completed' ? 'success' : 'warning'}
+                            variant="success"
                           >
-                            {payment.status === 'completed' ? 'Payé' : 'En attente'}
+                            Payé
                           </AnimatedBadge>
                           <AnimatedButton
                             variant="outline"

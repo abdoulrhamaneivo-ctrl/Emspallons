@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -11,33 +11,50 @@ import { useUserPresence } from './hooks/useUserPresence'
 import { CardSkeleton, TableSkeleton } from './components/ui/LoadingSkeleton'
 import { SEO } from './components/SEO'
 
+const lazyWithPreload = (loader) => {
+  const Component = lazy(loader)
+  Component.preload = loader
+  return Component
+}
+
 // Pages - Lazy loading pour optimiser les performances
-const Login = lazy(() => import('./pages/Login'))
-const Register = lazy(() => import('./pages/Register'))
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Students = lazy(() => import('./pages/Students'))
-const Payments = lazy(() => import('./pages/Payments'))
-const ScanQR = lazy(() => import('./pages/ScanQR'))
-const ScanHistory = lazy(() => import('./pages/ScanHistory'))
-const ControllerHistory = lazy(() => import('./pages/ControllerHistory'))
-const Controllers = lazy(() => import('./pages/Controllers'))
-const Admin = lazy(() => import('./pages/Admin'))
-const AdminUsers = lazy(() => import('./pages/AdminUsers'))
-const AdminClasses = lazy(() => import('./pages/AdminClasses'))
-const AdminNiveaux = lazy(() => import('./pages/AdminNiveaux'))
-const AdminActivityLogs = lazy(() => import('./pages/AdminActivityLogs'))
-const AdminLogs = lazy(() => import('./pages/AdminLogs'))
-const AdminLignes = lazy(() => import('./pages/AdminLignes'))
-const AdminPrix = lazy(() => import('./pages/AdminPrix'))
-const AdminPausedMonths = lazy(() => import('./pages/AdminPausedMonths'))
-const Rapports = lazy(() => import('./pages/Rapports'))
-const Rappels = lazy(() => import('./pages/Rappels'))
-const Aide = lazy(() => import('./pages/Aide'))
-const Profile = lazy(() => import('./pages/Profile'))
-const Unauthorized = lazy(() => import('./pages/Unauthorized'))
-const Test = lazy(() => import('./pages/Test'))
-const ResetSuccess = lazy(() => import('./pages/ResetSuccess'))
-const OnboardingTour = lazy(() => import('./components/onboarding/OnboardingTour'))
+const Login = lazyWithPreload(() => import('./pages/Login'))
+const Register = lazyWithPreload(() => import('./pages/Register'))
+const Dashboard = lazyWithPreload(() => import('./pages/Dashboard'))
+const Students = lazyWithPreload(() => import('./pages/Students'))
+const Payments = lazyWithPreload(() => import('./pages/Payments'))
+const ScanQR = lazyWithPreload(() => import('./pages/ScanQR'))
+const ScanHistory = lazyWithPreload(() => import('./pages/ScanHistory'))
+const ControllerHistory = lazyWithPreload(() => import('./pages/ControllerHistory'))
+const Controllers = lazyWithPreload(() => import('./pages/Controllers'))
+const Admin = lazyWithPreload(() => import('./pages/Admin'))
+const AdminUsers = lazyWithPreload(() => import('./pages/AdminUsers'))
+const AdminClasses = lazyWithPreload(() => import('./pages/AdminClasses'))
+const AdminNiveaux = lazyWithPreload(() => import('./pages/AdminNiveaux'))
+const AdminActivityLogs = lazyWithPreload(() => import('./pages/AdminActivityLogs'))
+const AdminLogs = lazyWithPreload(() => import('./pages/AdminLogs'))
+const AdminLignes = lazyWithPreload(() => import('./pages/AdminLignes'))
+const AdminPrix = lazyWithPreload(() => import('./pages/AdminPrix'))
+const AdminPausedMonths = lazyWithPreload(() => import('./pages/AdminPausedMonths'))
+const Rapports = lazyWithPreload(() => import('./pages/Rapports'))
+const Rappels = lazyWithPreload(() => import('./pages/Rappels'))
+const Aide = lazyWithPreload(() => import('./pages/Aide'))
+const Profile = lazyWithPreload(() => import('./pages/Profile'))
+const Unauthorized = lazyWithPreload(() => import('./pages/Unauthorized'))
+const Test = lazyWithPreload(() => import('./pages/Test'))
+const ResetSuccess = lazyWithPreload(() => import('./pages/ResetSuccess'))
+const BilanMensuel = lazyWithPreload(() => import('./pages/BilanMensuel'))
+const OnboardingTour = lazyWithPreload(() => import('./components/onboarding/OnboardingTour'))
+
+const criticalPrefetchComponents = [
+  Dashboard,
+  Students,
+  Payments,
+  ScanQR,
+  Controllers,
+  AdminUsers,
+  BilanMensuel,
+]
 
 // Composant de chargement
 const PageLoader = () => (
@@ -59,6 +76,29 @@ function AppRoutes() {
   
   // Activer le suivi de présence globalement
   useUserPresence()
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const schedulePrefetch = () => {
+      const task = () => {
+        criticalPrefetchComponents.forEach((Component) => {
+          Component.preload?.()
+        })
+      }
+
+      if ('requestIdleCallback' in window) {
+        const id = window.requestIdleCallback(task, { timeout: 2000 })
+        return () => window.cancelIdleCallback?.(id)
+      }
+
+      const timeoutId = window.setTimeout(task, 1000)
+      return () => window.clearTimeout(timeoutId)
+    }
+
+    const cleanup = schedulePrefetch()
+    return () => cleanup && cleanup()
+  }, [])
 
   if (loading) {
     return (
@@ -96,7 +136,8 @@ function AppRoutes() {
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.2 }}
         >
-          <Routes location={location}>
+          <Suspense fallback={<PageLoader />}>
+            <Routes location={location}>
           <Route
             path="/login"
             element={user ? <Navigate to="/dashboard" replace /> : <Login />}
@@ -210,6 +251,14 @@ function AppRoutes() {
             }
           />
           <Route
+            path="/bilan-mensuel"
+            element={
+              <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.EDUCATOR]}>
+                <BilanMensuel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/rappels"
             element={
               <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.EDUCATOR]}>
@@ -277,7 +326,8 @@ function AppRoutes() {
               }
             />
           )}
-          </Routes>
+            </Routes>
+          </Suspense>
         </motion.div>
       </AnimatePresence>
       

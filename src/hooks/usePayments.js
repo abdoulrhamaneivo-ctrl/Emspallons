@@ -1,53 +1,129 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import logger from '../lib/logger'
+import { CACHE_KEYS, getCache, setCache } from '../lib/dataCache'
+
+const PAYMENTS_CACHE_TTL = 5 * 60 * 1000
 
 export const usePayments = () => {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const mountedRef = useRef(true)
 
-  const fetchPayments = useCallback(async (filters = {}) => {
+  const updatePaymentsState = useCallback((updater) => {
+    setPayments((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      setCache(CACHE_KEYS.PAYMENTS, next, PAYMENTS_CACHE_TTL)
+      return next
+    })
+  }, [])
+
+  const fetchPayments = useCallback(
+    async ({ filters = {}, showLoader = true } = {}) => {
+      try {
+        if (showLoader && mountedRef.current) {
+          setLoading(true)
+        }
+        setError(null)
+        
+        let query = supabase
+          .from('payments')
+          .select('*, students(nom, prenom, id)')
+          .order('created_at', { ascending: false })
+
+        if (filters.studentId) {
+          query = query.eq('student_id', filters.studentId)
+        }
+
+        if (filters.status) {
+          query = query.eq('status', filters.status)
+        }
+
+        if (filters.startDate && filters.endDate) {
+          query = query
+            .gte('created_at', filters.startDate)
+            .lte('created_at', filters.endDate)
+        }
+
+        const { data, error: fetchError } = await query
+
+        if (fetchError) throw fetchError
+        if (mountedRef.current) {
+          updatePaymentsState(data || [])
+        }
+      } catch (err) {
+        if (mountedRef.current) {
+          setError(err.message)
+          toast.error('Erreur lors du chargement des paiements')
+        }
+        logger.error('Erreur lors du chargement des paiements', err)
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false)
+        }
+      }
+    },
+    [updatePaymentsState]
+  )
+
+  const loadPaymentWithRelations = useCallback(async (paymentId) => {
+    if (!paymentId) return null
     try {
-      setLoading(true)
-      setError(null)
-      
-      let query = supabase
+      const { data, error } = await supabase
         .from('payments')
         .select('*, students(nom, prenom, id)')
-        .order('created_at', { ascending: false })
+        .eq('id', paymentId)
+        .maybeSingle()
 
-      if (filters.studentId) {
-        query = query.eq('student_id', filters.studentId)
-      }
-
-      if (filters.status) {
-        query = query.eq('status', filters.status)
-      }
-
-      if (filters.startDate && filters.endDate) {
-        query = query
-          .gte('created_at', filters.startDate)
-          .lte('created_at', filters.endDate)
-      }
-
-      const { data, error: fetchError } = await query
-
-      if (fetchError) throw fetchError
-      setPayments(data || [])
+      if (error) throw error
+      return data
     } catch (err) {
-      setError(err.message)
-      toast.error('Erreur lors du chargement des paiements')
-      console.error(err)
-    } finally {
-      setLoading(false)
+      logger.warn('Impossible de recharger le paiement', { paymentId, error: err?.message })
+      return null
     }
   }, [])
 
+  const handleRealtimeChange = useCallback(
+    async (payload) => {
+      if (!payload || !mountedRef.current) return
+
+      const { eventType, new: newPayment, old: oldPayment } = payload
+
+      if (eventType === 'INSERT') {
+        const hydrated = await loadPaymentWithRelations(newPayment?.id)
+        if (hydrated) {
+          updatePaymentsState((prev) => [hydrated, ...prev])
+        } else {
+          fetchPayments({ showLoader: false })
+        }
+      } else if (eventType === 'UPDATE') {
+        const hydrated = await loadPaymentWithRelations(newPayment?.id)
+        if (hydrated) {
+          updatePaymentsState((prev) =>
+            prev.map((payment) => (payment.id === hydrated.id ? hydrated : payment))
+          )
+        } else {
+          fetchPayments({ showLoader: false })
+        }
+      } else if (eventType === 'DELETE' && oldPayment?.id) {
+        updatePaymentsState((prev) => prev.filter((payment) => payment.id !== oldPayment.id))
+      }
+    },
+    [fetchPayments, loadPaymentWithRelations, updatePaymentsState]
+  )
+
   useEffect(() => {
-    let mounted = true
-    
-    fetchPayments()
+    mountedRef.current = true
+
+    const cached = getCache(CACHE_KEYS.PAYMENTS, PAYMENTS_CACHE_TTL)
+    if (cached?.length) {
+      setPayments(cached)
+      setLoading(false)
+    }
+
+    fetchPayments({ showLoader: !(cached?.length) })
     
     // Abonnement temps réel pour synchronisation
     const subscription = supabase
@@ -59,20 +135,17 @@ export const usePayments = () => {
           schema: 'public',
           table: 'payments',
         },
-        () => {
-          // Rafraîchir les paiements quand il y a un changement
-          if (mounted) {
-            fetchPayments()
-          }
+        (payload) => {
+          handleRealtimeChange(payload)
         }
       )
       .subscribe()
 
     return () => {
-      mounted = false
+      mountedRef.current = false
       subscription.unsubscribe()
     }
-  }, [fetchPayments])
+  }, [fetchPayments, handleRealtimeChange])
 
   const createPayment = async (paymentData) => {
     try {
@@ -83,7 +156,7 @@ export const usePayments = () => {
         .single()
 
       if (createError) throw createError
-      setPayments((prev) => [data, ...prev])
+      updatePaymentsState((prev) => [data, ...prev])
       toast.success('Paiement enregistré avec succès')
       return { data, error: null }
     } catch (err) {
@@ -102,7 +175,7 @@ export const usePayments = () => {
         .single()
 
       if (updateError) throw updateError
-      setPayments((prev) =>
+      updatePaymentsState((prev) =>
         prev.map((payment) => (payment.id === id ? data : payment))
       )
       toast.success('Paiement mis à jour avec succès')

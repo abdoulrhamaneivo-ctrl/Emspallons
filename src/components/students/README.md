@@ -5,7 +5,7 @@
 ### 1. StudentList.jsx
 **Fonctionnalités :**
 - ✅ Grid de cartes étudiants avec photo placeholder (initiales)
-- ✅ Affichage : nom, prénom, classe, promotion, ligne de bus, statut paiement
+- ✅ Affichage : nom, prénom, classe, promotion, ligne de car, statut paiement
 - ✅ Badges colorés selon statut (ACTIF=vert, EN_RETARD=orange, EXPIRE=rouge, HORS_SERVICE=gris)
 - ✅ Actions : Modifier, Payer, Voir QR, Supprimer
 - ✅ Barre de recherche (nom, contact)

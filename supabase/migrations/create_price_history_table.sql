@@ -15,6 +15,9 @@ CREATE INDEX IF NOT EXISTS idx_price_history_date ON price_history(changed_at DE
 CREATE INDEX IF NOT EXISTS idx_price_history_type ON price_history(price_type);
 CREATE INDEX IF NOT EXISTS idx_price_history_entity ON price_history(entity_id);
 
+-- Activer RLS sur price_history
+ALTER TABLE IF EXISTS price_history ENABLE ROW LEVEL SECURITY;
+
 -- RLS Policies pour price_history
 DROP POLICY IF EXISTS "Only admins can view price history" ON price_history;
 DROP POLICY IF EXISTS "Only admins can create price history" ON price_history;

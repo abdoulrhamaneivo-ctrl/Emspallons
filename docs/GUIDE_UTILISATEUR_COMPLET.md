@@ -93,7 +93,7 @@ Le tableau de bord affiche :
    - **Contact*** : Numéro de téléphone (obligatoire)
    - **Classe*** : Sélectionnez la classe (obligatoire)
    - **Niveau*** : Sélectionnez le niveau (obligatoire)
-   - **Ligne*** : Sélectionnez la ligne de bus (obligatoire)
+   - **Ligne*** : Sélectionnez la ligne de car (obligatoire)
    - **Point de ramassage** : Lieu de ramassage
    - **Tuteur** : Nom du tuteur
 
@@ -114,7 +114,7 @@ Le tableau de bord affiche :
 - La recherche est en temps réel
 
 **Filtres** :
-- **Ligne** : Filtre par ligne de bus
+- **Ligne** : Filtre par ligne de car
 - **Statut** : ACTIF, EN_RETARD, EXPIRE, HORS_SERVICE
 - **Classe** : Filtre par classe
 - **Niveau** : Filtre par niveau
@@ -396,7 +396,7 @@ Les messages incluent automatiquement :
 1. Allez dans **"Rapports"**
 2. Sélectionnez :
    - **Mois** : Mois du bilan (format : novembre 2026)
-   - **Ligne** : Ligne de bus (ou "Toutes" pour toutes les lignes)
+   - **Ligne** : Ligne de car (ou "Toutes" pour toutes les lignes)
    - **Format** : CSV ou Excel
 
 3. Cliquez sur **"Générer et visualiser"**

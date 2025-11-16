@@ -15,9 +15,10 @@ import { supabase } from '../lib/supabase'
 import logger from '../lib/logger'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, startTransition } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { formatDate } from '../lib/utils'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 export default function Dashboard() {
@@ -96,7 +97,10 @@ export default function Dashboard() {
       case 'add-student':
         // Utiliser sessionStorage comme fallback
         sessionStorage.setItem('openStudentForm', 'true')
-        navigate('/students', { state: { openForm: true } })
+        // Utiliser startTransition pour les lazy-loaded components (React 18)
+        startTransition(() => {
+          navigate('/students', { state: { openForm: true } })
+        })
         // Également dispatcher l'événement après un court délai
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('open-student-form'))
@@ -105,7 +109,10 @@ export default function Dashboard() {
       case 'add-payment':
         // Utiliser sessionStorage comme fallback
         sessionStorage.setItem('openPaymentForm', 'true')
-        navigate('/payments', { state: { openPayment: true } })
+        // Utiliser startTransition pour les lazy-loaded components (React 18)
+        startTransition(() => {
+          navigate('/payments', { state: { openPayment: true } })
+        })
         // Également dispatcher l'événement après un court délai
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('open-payment-form'))
@@ -115,7 +122,10 @@ export default function Dashboard() {
         handleGenerateReport()
         break
       case 'scan-qr':
-        navigate('/scan')
+        // Utiliser startTransition pour les lazy-loaded components (React 18)
+        startTransition(() => {
+          navigate('/scan')
+        })
         break
       default:
         break
@@ -123,13 +133,20 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    if (role === 'admin' || role === 'educator') {
-      fetchRecentReminders()
+    // Charger les données de manière progressive (non bloquant)
+    // Attendre que les données principales soient chargées
+    if (!studentsLoading && !paymentsLoading && !scansLoading) {
+      // Charger les données supplémentaires après un court délai (non bloquant)
+      setTimeout(() => {
+        if (role === 'admin' || role === 'educator') {
+          fetchRecentReminders()
+        }
+        loadTodayScans()
+        loadPaymentsData()
+        loadLineData()
+      }, 100) // Petit délai pour permettre au Dashboard de s'afficher rapidement
     }
-    loadTodayScans()
-    loadPaymentsData()
-    loadLineData()
-  }, [role, students, payments, scans])
+  }, [role, studentsLoading, paymentsLoading, scansLoading])
 
   // Charger les scans par heure (aujourd'hui)
   const loadTodayScans = async () => {
@@ -180,7 +197,7 @@ export default function Dashboard() {
       ) || []
       
       return {
-        date: date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }),
+        date: formatDate(date, 'EEE d'), // Format français : "lun. 15"
         montant: dayPayments.reduce((sum, p) => sum + (p.montant_total || 0), 0) / 1000, // En milliers
         count: dayPayments.length
       }
@@ -234,7 +251,7 @@ export default function Dashboard() {
     try {
       const headers = ['Date', 'Étudiant', 'Montant (FCFA)', 'Nombre de mois']
       const rows = payments?.map(payment => [
-        new Date(payment.created_at).toLocaleDateString('fr-FR'),
+        formatDate(payment.created_at, 'dd/MM/yyyy'), // Format français : "15/11/2026"
         `${payment.students?.nom || ''} ${payment.students?.prenom || ''}`,
         payment.montant_total || 0,
         payment.nombre_mois || 0,
