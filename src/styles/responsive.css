@@ -196,4 +196,264 @@
   }
 }
 
+/* ============================================
+   OPTIMISATIONS MOBILE COMPLÈTES
+   ============================================ */
+
+/* Base mobile - Utilisation complète de l'écran */
+@media (max-width: 768px) {
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    padding: 0 !important;
+    margin: 0;
+    overflow-x: hidden;
+    position: relative;
+    /* Safe area support - géré par index.css */
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Réduction des espacements sur mobile */
+  .container,
+  .max-w-7xl,
+  .max-w-6xl,
+  .max-w-5xl,
+  .max-w-4xl {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  /* Optimisation des cartes */
+  .card,
+  [class*="bg-white"][class*="rounded"],
+  [class*="shadow"] {
+    padding: 1rem !important;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Optimisation des titres */
+  h1 {
+    font-size: 1.75rem !important;
+    line-height: 1.3 !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.4 !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  h3 {
+    font-size: 1.25rem !important;
+    line-height: 1.4 !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  /* Optimisation des paragraphes */
+  p {
+    font-size: 0.9375rem !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Optimisation des grilles */
+  .grid {
+    gap: 0.75rem !important;
+  }
+
+  .grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+
+  /* Optimisation des boutons */
+  button,
+  .button,
+  [role="button"],
+  a[role="button"] {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    padding: 0.625rem 1rem !important;
+    font-size: 0.9375rem !important;
+    border-radius: 0.75rem !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Optimisation des inputs */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+    padding: 0.75rem 1rem !important;
+    border-radius: 0.75rem !important;
+    min-height: 44px !important;
+  }
+
+  /* Optimisation des espacements généraux */
+  .space-y-6 > * + *,
+  .space-y-8 > * + * {
+    margin-top: 1rem !important;
+  }
+
+  .space-x-4 > * + *,
+  .space-x-6 > * + * {
+    margin-left: 0.75rem !important;
+  }
+
+  /* Padding réduit sur mobile */
+  .p-4 {
+    padding: 0.75rem !important;
+  }
+
+  .p-6 {
+    padding: 1rem !important;
+  }
+
+  .p-8 {
+    padding: 1.25rem !important;
+  }
+
+  .px-4 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .px-6 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .px-8 {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+
+  .py-4 {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .py-6 {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .py-8 {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+
+  /* Margin réduit sur mobile */
+  .mb-6 {
+    margin-bottom: 1rem !important;
+  }
+
+  .mb-8 {
+    margin-bottom: 1.25rem !important;
+  }
+
+  .mt-6 {
+    margin-top: 1rem !important;
+  }
+
+  .mt-8 {
+    margin-top: 1.25rem !important;
+  }
+
+  /* Optimisation des tableaux */
+  table {
+    font-size: 0.875rem !important;
+  }
+
+  th,
+  td {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Optimisation des modales */
+  [role="dialog"],
+  .modal,
+  [class*="modal"] {
+    margin: 0.5rem !important;
+    max-width: calc(100vw - 1rem) !important;
+    max-height: calc(100vh - 1rem) !important;
+  }
+
+  /* Optimisation des toasts */
+  .toast {
+    margin: 0.5rem !important;
+    max-width: calc(100vw - 1rem) !important;
+  }
+}
+
+/* Très petits écrans (< 375px) */
+@media (max-width: 374px) {
+  body {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 1.5rem !important;
+  }
+
+  h2 {
+    font-size: 1.25rem !important;
+  }
+
+  h3 {
+    font-size: 1.125rem !important;
+  }
+
+  button,
+  .button {
+    font-size: 0.875rem !important;
+    padding: 0.5rem 0.875rem !important;
+  }
+}
+
+/* Mode paysage mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  body {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .container {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+}
+
+/* Support iOS safe area - géré par index.css pour éviter doublons */
+
+/* Optimisation des performances sur mobile */
+@media (max-width: 768px) {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Réduction des animations sur mobile pour meilleure performance */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
 

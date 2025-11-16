@@ -49,7 +49,7 @@ export default function Layout({ children }) {
         )}
 
         {/* Main Content */}
-        <main className={`flex-1 overflow-y-auto ${isMobile ? 'pb-20' : 'p-4 sm:p-6 lg:p-8'}`}>
+        <main className={`flex-1 overflow-y-auto ${isMobile ? 'pb-20 px-2 py-2' : 'p-4 sm:p-6 lg:p-8'}`}>
           {children}
         </main>
       </div>

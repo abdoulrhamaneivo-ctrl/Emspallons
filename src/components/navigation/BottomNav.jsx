@@ -37,8 +37,8 @@ export default function BottomNav() {
 
   if (role === 'controller') {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-inset-bottom">
-        <div className="flex justify-around items-center h-16 px-2">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-inset-bottom" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="flex justify-around items-center h-16 px-2" style={{ minHeight: '64px', paddingBottom: 'max(env(safe-area-inset-bottom), 0px)' }}>
           <Link
             to="/scan"
             className={`flex flex-col items-center justify-center flex-1 h-full ${
@@ -64,8 +64,8 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-inset-bottom">
-        <div className="flex justify-around items-center h-16 px-2">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-inset-bottom" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="flex justify-around items-center h-16 px-2" style={{ minHeight: '64px', paddingBottom: 'max(env(safe-area-inset-bottom), 0px)' }}>
           {mainItems.map((item) => {
             const Icon = item.icon
             return (
