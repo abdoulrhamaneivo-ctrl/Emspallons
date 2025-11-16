@@ -1,5 +1,5 @@
-import { useState, startTransition } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useState, startTransition, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Layout from '../components/Layout'
@@ -11,6 +11,16 @@ import { FloatingShapes, GradientOrb } from '../components/ui/DecorativeElements
 import RecentProfiles from '../components/auth/RecentProfiles'
 import { Shield } from 'lucide-react'
 
+// Précharger ScanQR pour éviter les pages blanches
+let ScanQRPreloaded = false
+const preloadScanQR = () => {
+  if (ScanQRPreloaded) return
+  ScanQRPreloaded = true
+  import('../pages/ScanQR').catch(() => {
+    ScanQRPreloaded = false
+  })
+}
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,6 +28,25 @@ export default function Login() {
   const [showFullForm, setShowFullForm] = useState(false)
   const { signIn } = useAuth()
   const navigate = useNavigate()
+
+  // Précharger ScanQR au montage du composant
+  useEffect(() => {
+    // Précharger immédiatement si possible, sinon après un court délai
+    const timer = setTimeout(() => {
+      preloadScanQR()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleControllerAccess = (e) => {
+    e.preventDefault()
+    // Précharger avant la navigation
+    preloadScanQR()
+    // Utiliser startTransition pour éviter les suspensions React 18
+    startTransition(() => {
+      navigate('/scan')
+    })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -167,15 +196,15 @@ export default function Login() {
                 transition={{ delay: 0.8 }}
                 className="mt-6"
               >
-                <Link to="/scan">
-                  <AnimatedButton
-                    variant="outline"
-                    className="w-full flex items-center justify-center space-x-2 bg-emsp-green hover:bg-emsp-lightGreen text-white border-emsp-green"
-                  >
-                    <Shield size={18} />
-                    <span>👮 Accès Contrôleur</span>
-                  </AnimatedButton>
-                </Link>
+                <AnimatedButton
+                  onClick={handleControllerAccess}
+                  onMouseEnter={preloadScanQR}
+                  variant="outline"
+                  className="w-full flex items-center justify-center space-x-2 bg-emsp-green hover:bg-emsp-lightGreen text-white border-emsp-green"
+                >
+                  <Shield size={18} />
+                  <span>👮 Accès Contrôleur</span>
+                </AnimatedButton>
               </motion.div>
             </div>
           </motion.div>
