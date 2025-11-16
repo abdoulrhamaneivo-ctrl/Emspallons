@@ -311,6 +311,8 @@ export const generateReceiptPDF = async (payment, student) => {
       ['Ligne de car', student.lines?.nom || 'N/A'],
     ]
   
+    // Utiliser setTextColor avant autoTable (autoTable héritera de la couleur)
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     autoTable(doc, {
       startY: yPosition + 3,
       head: false,
@@ -324,19 +326,29 @@ export const generateReceiptPDF = async (payment, student) => {
       columnStyles: {
         0: { 
           fontStyle: 'bold', 
-          cellWidth: 50, 
-          textColor: [gRgb.r, gRgb.g, gRgb.b],
+          cellWidth: 50,
           font: 'helvetica',
         },
         1: { 
           cellWidth: 'auto',
-          textColor: [gdRgb.r, gdRgb.g, gdRgb.b],
         },
       },
       margin: { left: margin + 3, right: margin + 3 },
       tableLineColor: [0, 0, 0, 0],
       tableLineWidth: 0,
     })
+    // Redessiner la colonne 0 (labels) en vert après autoTable
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    const tableStartY = yPosition + 3
+    studentData.forEach((row, index) => {
+      const rowY = tableStartY + (index * 10) + 8
+      doc.text(row[0] || '', margin + 3, rowY)
+    })
+    // Remettre la couleur normale pour la suite
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
+    doc.setFont('helvetica', 'normal')
   
     yPosition = doc.lastAutoTable.finalY + 15
   
@@ -361,14 +373,15 @@ export const generateReceiptPDF = async (payment, student) => {
       ]
     ]
   
+    // Définir les couleurs avant autoTable
+    doc.setFillColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.setTextColor(255, 255, 255)
     autoTable(doc, {
       startY: yPosition,
       head: [paymentData[0]],
       body: [paymentData[1]],
       theme: 'striped',
       headStyles: {
-        fillColor: [gRgb.r, gRgb.g, gRgb.b],
-        textColor: [255, 255, 255],
         fontStyle: 'bold',
         fontSize: 10,
         cellPadding: 6,
@@ -376,19 +389,25 @@ export const generateReceiptPDF = async (payment, student) => {
       bodyStyles: {
         fontSize: 10,
         cellPadding: 6,
-        textColor: [gdRgb.r, gdRgb.g, gdRgb.b],
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245],
       },
       columnStyles: {
         0: { cellWidth: 70, fontStyle: 'bold' },
         1: { cellWidth: 35, halign: 'center' },
         2: { cellWidth: 40, halign: 'right' },
-        3: { cellWidth: 40, halign: 'right', fontStyle: 'bold', textColor: [gRgb.r, gRgb.g, gRgb.b] },
+        3: { cellWidth: 40, halign: 'right', fontStyle: 'bold' },
       },
       margin: { left: margin, right: margin },
     })
+    // Remettre la couleur du texte normale après autoTable
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
+    // Redessiner la colonne 3 (montant total) en vert
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.setFont('helvetica', 'bold')
+    const paymentTableY = yPosition
+    const bodyRowY = paymentTableY + 10 + 6 // Hauteur header + padding
+    doc.text(paymentData[1][3] || '', pageWidth - margin - 40, bodyRowY, { align: 'right' })
+    // Remettre la couleur normale
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
   
     yPosition = doc.lastAutoTable.finalY + 12
   
@@ -408,7 +427,7 @@ export const generateReceiptPDF = async (payment, student) => {
     // PÉRIODE COUVERTE - Design moderne
     // ============================================
     
-    doc.setFillColor([lgRgb.r, lgRgb.g, lgRgb.b])
+    doc.setFillColor(lgRgb.r, lgRgb.g, lgRgb.b)
     doc.setGState(doc.GState({ opacity: 0.15 }))
     doc.roundedRect(margin, yPosition, contentWidth, 25, 5, 5, 'F')
     doc.setGState(doc.GState({ opacity: 1 }))
@@ -440,7 +459,7 @@ export const generateReceiptPDF = async (payment, student) => {
     // ============================================
     
     // Séparateur décoratif
-    hr(doc, yPosition, [yRgb.r, yRgb.g, yRgb.b], 2, margin, pageWidth - margin)
+    hr(doc, yPosition, { r: yRgb.r, g: yRgb.g, b: yRgb.b }, 2, margin, pageWidth - margin)
     
     yPosition += 8
   
@@ -504,7 +523,7 @@ export const generateReceiptPDF = async (payment, student) => {
     doc.text('L\'Administration EMSP', pageWidth - margin, signatureY, { align: 'right' })
     
     // Ligne de signature avec style
-    hr(doc, signatureY + 3, [gRgb.r, gRgb.g, gRgb.b], 1, pageWidth - margin - 50, pageWidth - margin)
+    hr(doc, signatureY + 3, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 1, pageWidth - margin - 50, pageWidth - margin)
   
     // Numéro de page (si plusieurs pages)
     doc.setFontSize(8)
