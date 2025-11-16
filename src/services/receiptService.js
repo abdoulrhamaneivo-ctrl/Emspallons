@@ -250,7 +250,7 @@ export const generateReceiptPDF = async (payment, student) => {
       doc.circle(pageWidth / 2, 17, 8, 'F')
       doc.setFillColor(gRgb.r, gRgb.g, gRgb.b)
       doc.circle(pageWidth / 2, 17, 6, 'F')
-      doc.setTextColor([255, 255, 255])
+      doc.setTextColor(255, 255, 255)
       doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
       doc.text('EMSP', pageWidth / 2, 19, { align: 'center' })
@@ -259,7 +259,7 @@ export const generateReceiptPDF = async (payment, student) => {
     // Titre principal (dans la bande verte)
     doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([255, 255, 255])
+    doc.setTextColor(255, 255, 255)
     doc.text('REÇU DE PAIEMENT', pageWidth / 2, 18, { align: 'center' })
   
     yPosition = 50
@@ -276,12 +276,12 @@ export const generateReceiptPDF = async (payment, student) => {
     
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([gRgb.r, gRgb.g, gRgb.b])
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.text(`N° ${receiptNumber}`, margin + 5, yPosition + 8)
     
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor([gdRgb.r, gdRgb.g, gdRgb.b])
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     doc.text(`Émis le ${emissionDate}`, pageWidth - margin - 5, yPosition + 8, { align: 'right' })
   
     yPosition += 22
@@ -293,7 +293,7 @@ export const generateReceiptPDF = async (payment, student) => {
     // Titre de section
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([gRgb.r, gRgb.g, gRgb.b])
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.text('INFORMATIONS ÉTUDIANT', margin, yPosition)
     
     yPosition += 8
@@ -346,7 +346,7 @@ export const generateReceiptPDF = async (payment, student) => {
     
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([gRgb.r, gRgb.g, gRgb.b])
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.text('DÉTAILS DU PAIEMENT', margin, yPosition)
     
     yPosition += 8
@@ -398,7 +398,7 @@ export const generateReceiptPDF = async (payment, student) => {
     
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([255, 255, 255])
+    doc.setTextColor(255, 255, 255)
     doc.text('TOTAL PAYÉ', margin + 10, yPosition + 8)
     doc.text(formatCurrency(payment.montant_total), pageWidth - margin - 10, yPosition + 8, { align: 'right' })
   
@@ -415,12 +415,12 @@ export const generateReceiptPDF = async (payment, student) => {
   
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([gRgb.r, gRgb.g, gRgb.b])
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.text('PÉRIODE COUVERTE', margin + 5, yPosition + 8)
     
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor([gdRgb.r, gdRgb.g, gdRgb.b])
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     
     const startDate = formatDateFrench(payment.date_debut)
     const endDate = formatDateFrench(payment.date_fin)
@@ -430,7 +430,7 @@ export const generateReceiptPDF = async (payment, student) => {
     
     // Icône de calendrier (simulée avec texte)
     doc.setFontSize(8)
-    doc.setTextColor([gmRgb.r, gmRgb.g, gmRgb.b])
+    doc.setTextColor(gmRgb.r, gmRgb.g, gmRgb.b)
     doc.text('📅', pageWidth - margin - 30, yPosition + 14)
   
     yPosition += 32
@@ -463,7 +463,7 @@ export const generateReceiptPDF = async (payment, student) => {
         // Texte sous le QR code
         doc.setFontSize(7)
         doc.setFont('helvetica', 'normal')
-        doc.setTextColor([gdRgb.r, gdRgb.g, gdRgb.b])
+        doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
         doc.text('Scanner pour vérifier', qrCodeX + qrCodeSize / 2 + 2, qrCodeY + qrCodeSize + 10, { align: 'center' })
       }
     } catch (error) {
@@ -483,13 +483,13 @@ export const generateReceiptPDF = async (payment, student) => {
     
     doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([gRgb.r, gRgb.g, gRgb.b])
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.text('École Multinationale Supérieure', infoX + 3, infoY + 6)
     doc.text('des Postes d\'Abidjan', infoX + 3, infoY + 11)
     
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
-    doc.setTextColor([gdRgb.r, gdRgb.g, gdRgb.b])
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     doc.text('📍 18 BP 42 Abidjan 18', infoX + 3, infoY + 17)
     doc.text('Treichville, Zone 3, Km4', infoX + 3, infoY + 22)
     doc.text('📞 +225 27 21 21 45 60', infoX + 3, infoY + 27)
@@ -500,7 +500,7 @@ export const generateReceiptPDF = async (payment, student) => {
     
     doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor([gdRgb.r, gdRgb.g, gdRgb.b])
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     doc.text('L\'Administration EMSP', pageWidth - margin, signatureY, { align: 'right' })
     
     // Ligne de signature avec style
@@ -509,7 +509,7 @@ export const generateReceiptPDF = async (payment, student) => {
     // Numéro de page (si plusieurs pages)
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor([gmRgb.r, gmRgb.g, gmRgb.b])
+    doc.setTextColor(gmRgb.r, gmRgb.g, gmRgb.b)
     doc.text(`Page 1/1`, pageWidth / 2, pageHeight - 10, { align: 'center' })
 
     return doc
