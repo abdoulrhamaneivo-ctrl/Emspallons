@@ -1,4 +1,4 @@
-import { useState, startTransition, useEffect } from 'react'
+import { useState, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
@@ -11,16 +11,6 @@ import { FloatingShapes, GradientOrb } from '../components/ui/DecorativeElements
 import RecentProfiles from '../components/auth/RecentProfiles'
 import { Shield } from 'lucide-react'
 
-// Précharger ScanQR pour éviter les pages blanches
-let ScanQRPreloaded = false
-const preloadScanQR = () => {
-  if (ScanQRPreloaded) return
-  ScanQRPreloaded = true
-  import('../pages/ScanQR').catch(() => {
-    ScanQRPreloaded = false
-  })
-}
-
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,20 +19,10 @@ export default function Login() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
 
-  // Précharger ScanQR au montage du composant
-  useEffect(() => {
-    // Précharger immédiatement si possible, sinon après un court délai
-    const timer = setTimeout(() => {
-      preloadScanQR()
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [])
-
   const handleControllerAccess = (e) => {
     e.preventDefault()
-    // Précharger avant la navigation
-    preloadScanQR()
-    // Utiliser startTransition pour éviter les suspensions React 18
+    // ScanQR est maintenant chargé de manière synchrone, donc pas de suspension
+    // Utiliser startTransition pour une navigation fluide
     startTransition(() => {
       navigate('/scan')
     })
@@ -198,7 +178,6 @@ export default function Login() {
               >
                 <AnimatedButton
                   onClick={handleControllerAccess}
-                  onMouseEnter={preloadScanQR}
                   variant="outline"
                   className="w-full flex items-center justify-center space-x-2 bg-emsp-green hover:bg-emsp-lightGreen text-white border-emsp-green"
                 >

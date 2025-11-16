@@ -23,7 +23,8 @@ const Register = lazyWithPreload(() => import('./pages/Register'))
 const Dashboard = lazyWithPreload(() => import('./pages/Dashboard'))
 const Students = lazyWithPreload(() => import('./pages/Students'))
 const Payments = lazyWithPreload(() => import('./pages/Payments'))
-const ScanQR = lazyWithPreload(() => import('./pages/ScanQR'))
+// ScanQR chargé de manière synchrone pour éviter les suspensions lors de la navigation
+import ScanQR from './pages/ScanQR'
 const ScanHistory = lazyWithPreload(() => import('./pages/ScanHistory'))
 const ControllerHistory = lazyWithPreload(() => import('./pages/ControllerHistory'))
 const Controllers = lazyWithPreload(() => import('./pages/Controllers'))
@@ -50,7 +51,7 @@ const criticalPrefetchComponents = [
   Dashboard,
   Students,
   Payments,
-  ScanQR,
+  // ScanQR n'est plus lazy-loaded, donc pas besoin de préchargement
   Controllers,
   AdminUsers,
   BilanMensuel,

@@ -21,16 +21,6 @@ import { fr } from 'date-fns/locale'
 import { formatDate } from '../lib/utils'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
-// Précharger ScanQR pour éviter les pages blanches
-let ScanQRPreloaded = false
-const preloadScanQR = () => {
-  if (ScanQRPreloaded) return
-  ScanQRPreloaded = true
-  import('./ScanQR').catch(() => {
-    ScanQRPreloaded = false
-  })
-}
-
 export default function Dashboard() {
   const { user, role } = useAuth()
   const navigate = useNavigate()
@@ -132,9 +122,8 @@ export default function Dashboard() {
         handleGenerateReport()
         break
       case 'scan-qr':
-        // Précharger avant la navigation
-        preloadScanQR()
-        // Utiliser startTransition pour les lazy-loaded components (React 18)
+        // ScanQR est maintenant chargé de manière synchrone, donc pas de suspension
+        // Utiliser startTransition pour une navigation fluide
         startTransition(() => {
           navigate('/scan')
         })

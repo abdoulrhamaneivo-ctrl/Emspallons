@@ -1,15 +1,5 @@
 import { useState, useEffect, startTransition } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-// Précharger ScanQR pour éviter les pages blanches
-let ScanQRPreloaded = false
-const preloadScanQR = () => {
-  if (ScanQRPreloaded) return
-  ScanQRPreloaded = true
-  import('./ScanQR').catch(() => {
-    ScanQRPreloaded = false
-  })
-}
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, Download, Calendar, Filter } from 'lucide-react'
 import AnimatedCard from '../components/ui/AnimatedCard'
@@ -39,7 +29,6 @@ export default function ControllerHistory() {
     // Récupérer la session contrôleur
     const stored = sessionStorage.getItem('controller_session')
     if (!stored) {
-      preloadScanQR()
       startTransition(() => {
         navigate('/scan')
       })
@@ -50,7 +39,6 @@ export default function ControllerHistory() {
       const parsed = JSON.parse(stored)
       setController(parsed.controller_session)
     } catch (e) {
-      preloadScanQR()
       startTransition(() => {
         navigate('/scan')
       })
@@ -193,7 +181,6 @@ export default function ControllerHistory() {
                 <AnimatedButton
                   variant="outline"
                   onClick={() => {
-                    preloadScanQR()
                     startTransition(() => {
                       navigate('/scan')
                     })
