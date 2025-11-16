@@ -1,4 +1,4 @@
-import { useEffect, useRef, startTransition } from 'react'
+import { useEffect, useRef, startTransition, useState, useCallback } from 'react'
 import { useBreakpoint } from '../../hooks/useBreakpoint'
 import { LogOut, History } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -20,6 +20,15 @@ export default function ScannerMobile({ children }) {
   const { isMobile } = useBreakpoint()
   const navigate = useNavigate()
   const containerRef = useRef(null)
+  const [canShowControls, setCanShowControls] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return Boolean(sessionStorage.getItem('controller_session'))
+  })
+
+  const refreshControlState = useCallback(() => {
+    if (typeof window === 'undefined') return
+    setCanShowControls(Boolean(sessionStorage.getItem('controller_session')))
+  }, [])
 
   useEffect(() => {
     if (!isMobile) return
@@ -50,6 +59,7 @@ export default function ScannerMobile({ children }) {
 
     // Lock orientation au montage
     lockOrientation()
+    refreshControlState()
 
     return () => {
       // Déverrouiller l'orientation au démontage
@@ -62,7 +72,17 @@ export default function ScannerMobile({ children }) {
       }
       delete window.scannerVibrate
     }
-  }, [isMobile])
+  }, [isMobile, refreshControlState])
+
+  useEffect(() => {
+    const handleSessionChange = () => {
+      refreshControlState()
+    }
+    window.addEventListener('controller-session-changed', handleSessionChange)
+    return () => {
+      window.removeEventListener('controller-session-changed', handleSessionChange)
+    }
+  }, [refreshControlState])
 
   if (!isMobile) {
     return <>{children}</>
@@ -85,6 +105,7 @@ export default function ScannerMobile({ children }) {
       </div>
 
       {/* Contrôles en bas (zone safe) */}
+      {canShowControls && (
       <div className="scanner-controls flex justify-center items-center gap-4">
         <button
           onClick={(e) => {
@@ -131,6 +152,8 @@ export default function ScannerMobile({ children }) {
             
             // Nettoyer la session
             sessionStorage.removeItem('controller_session')
+            window.dispatchEvent(new Event('controller-session-changed'))
+            refreshControlState()
             
             // Utiliser startTransition pour navigation fluide
             startTransition(() => {
@@ -162,6 +185,7 @@ export default function ScannerMobile({ children }) {
           <span className="hidden sm:inline">Retour</span>
         </button>
       </div>
+      )}
     </div>
   )
 }

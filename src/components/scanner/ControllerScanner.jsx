@@ -62,6 +62,7 @@ export default function ControllerScanner() {
 
   const handleLogout = () => {
     sessionStorage.removeItem('controller_session')
+    window.dispatchEvent(new Event('controller-session-changed'))
     setController(null)
     stopScanning()
     toast.success('Déconnexion réussie')
@@ -334,7 +335,7 @@ export default function ControllerScanner() {
         }
       }, 3000)
     }
-  }, [controller])
+  }, [controller, scanning])
 
   const initializeScanner = useCallback(async () => {
     if (!controller || !scanning) return
@@ -385,7 +386,7 @@ export default function ControllerScanner() {
       await html5QrCode.start(
         { facingMode: 'environment' },
         config,
-        async (decodedText, decodedResult) => {
+        async (decodedText) => {
           // Arrêter temporairement le scanner pendant le traitement
           if (!controllerRef.current) return
           
@@ -531,7 +532,7 @@ export default function ControllerScanner() {
     return () => {
       stopScanning()
     }
-  }, [])
+  }, [stopScanning])
 
   // Écran 1 : Authentification
   if (!controller) {
