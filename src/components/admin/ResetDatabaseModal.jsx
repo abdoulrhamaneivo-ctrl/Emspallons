@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import logger from '../../lib/logger'
 import toast from 'react-hot-toast'
-import { AlertTriangle, Shield, Trash2, Download, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Shield, Trash2, Download, RefreshCw, HelpCircle } from 'lucide-react'
 import { Button } from '../ui'
 import AnimatedModal from '../ui/AnimatedModal'
 
 export default function ResetDatabaseModal({ isOpen, onClose }) {
+  const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [confirmText, setConfirmText] = useState('')
   const [backupData, setBackupData] = useState(null)
@@ -14,6 +16,15 @@ export default function ResetDatabaseModal({ isOpen, onClose }) {
   const [isCreatingBackup, setIsCreatingBackup] = useState(false)
 
   const CONFIRMATION_TEXT = 'RÉINITIALISER TOUT'
+
+  const handleHelpClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onClose() // Fermer le modal
+    setTimeout(() => {
+      navigate('/aide')
+    }, 300)
+  }
 
   // Étape 1 : Créer backup
   const createBackup = async () => {
@@ -160,6 +171,15 @@ export default function ResetDatabaseModal({ isOpen, onClose }) {
               <p className="mt-4 text-red-700 font-semibold">
                 ⚠️ Seuls les comptes administrateurs seront préservés
               </p>
+              <div className="mt-4 pt-4 border-t border-red-300">
+                <button
+                  onClick={handleHelpClick}
+                  className="flex items-center gap-2 text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
+                >
+                  <HelpCircle size={16} />
+                  <span>Besoin d'aide ? Consulter la documentation</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

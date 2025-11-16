@@ -278,15 +278,41 @@ export default function BilanMensuel() {
       const ws1 = XLSX.utils.aoa_to_sheet(resumeData)
       XLSX.utils.book_append_sheet(wb, ws1, 'Résumé')
 
-      const paymentsData = bilanData.payments.map((payment) => ({
-        Date: format(new Date(payment.created_at), 'dd/MM/yyyy'),
-        Référence: generateReference(payment.id, payment.created_at),
-        Étudiant: `${payment.student?.nom || ''} ${payment.student?.prenom || ''}`.trim(),
-        'Ligne de car': payment.student?.lines?.nom || '-',
-        'Mois couverts': (payment.sessions || []).join(', '),
-        'Nombre de mois': payment.nombre_mois || 0,
-        'Montant (FCFA)': payment.montant_total || 0,
-      }))
+      const paymentsData = bilanData.payments.map((payment) => {
+        const sessions = payment.sessions || []
+        const currentMonth = selectedMonth
+        let moisCouverts = '-'
+        
+        // Si le paiement couvre plusieurs mois, montrer le format "1/5"
+        if (sessions.length > 1) {
+          const monthIndex = sessions.indexOf(currentMonth)
+          if (monthIndex !== -1) {
+            // Format "1/5" pour ce mois dans le bilan
+            moisCouverts = `${monthIndex + 1}/${sessions.length} (${sessions.join(', ')})`
+          } else {
+            // Ce mois n'est pas dans ce paiement
+            moisCouverts = `0/${sessions.length} (${sessions.join(', ')})`
+          }
+        } else if (sessions.length === 1) {
+          moisCouverts = sessions[0]
+        }
+        
+        return {
+          Date: format(new Date(payment.created_at), 'dd/MM/yyyy'),
+          Référence: generateReference(payment.id, payment.created_at),
+          Étudiant: `${payment.student?.nom || ''} ${payment.student?.prenom || ''}`.trim(),
+          'Ligne de car': payment.student?.lines?.nom || '-',
+          'Mois couverts': moisCouverts,
+          'Position dans paiement': sessions.length > 1 && sessions.indexOf(currentMonth) !== -1 
+            ? `${sessions.indexOf(currentMonth) + 1}/${sessions.length}`
+            : sessions.length > 1 ? `0/${sessions.length}` : '1/1',
+          'Nombre total de mois': payment.nombre_mois || sessions.length || 0,
+          'Montant total (FCFA)': payment.montant_total || 0,
+          'Montant ce mois (FCFA)': sessions.length > 0 && sessions.includes(currentMonth)
+            ? Math.round((payment.montant_total || 0) / sessions.length)
+            : 0,
+        }
+      })
 
       const ws2 = XLSX.utils.json_to_sheet(paymentsData)
       XLSX.utils.book_append_sheet(wb, ws2, 'Paiements')
@@ -636,14 +662,56 @@ export default function BilanMensuel() {
                             </td>
                             <td className="px-3 py-2">{payment.student?.lines?.nom || '—'}</td>
                             <td className="px-3 py-2">
-                              {(payment.sessions || []).length > 0
-                                ? (payment.sessions || []).join(', ')
-                                : '—'}
+                              {(payment.sessions || []).length > 0 ? (() => {
+                                const sessions = payment.sessions || []
+                                const currentMonth = selectedMonth
+                                const sessionsInCurrentMonth = sessions.filter(s => s === currentMonth).length
+                                
+                                // Si le paiement couvre plusieurs mois, montrer le format "1/5"
+                                if (sessions.length > 1) {
+                                  const monthIndex = sessions.indexOf(currentMonth)
+                                  if (monthIndex !== -1) {
+                                    // Format "1/5" pour ce mois dans le bilan
+                                    return (
+                                      <span className="inline-flex items-center gap-1">
+                                        <span className="font-semibold text-emsp-green">
+                                          {monthIndex + 1}/{sessions.length}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                          ({sessions.join(', ')})
+                                        </span>
+                                      </span>
+                                    )
+                                  }
+                                }
+                                
+                                // Sinon, afficher normalement
+                                return sessions.join(', ')
+                              })() : '—'}
                             </td>
                             <td className="px-3 py-2 text-right font-semibold">
-                              {payment.montant_total
-                                ? `${payment.montant_total.toLocaleString('fr-FR')} FCFA`
-                                : '—'}
+                              {payment.montant_total ? (() => {
+                                const sessions = payment.sessions || []
+                                const currentMonth = selectedMonth
+                                
+                                // Si le paiement couvre plusieurs mois, montrer le montant de ce mois uniquement
+                                if (sessions.length > 1 && sessions.includes(currentMonth)) {
+                                  const montantMois = Math.round(payment.montant_total / sessions.length)
+                                  return (
+                                    <span className="inline-flex flex-col items-end">
+                                      <span className="text-emsp-green font-semibold">
+                                        {montantMois.toLocaleString('fr-FR')} FCFA
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        (sur {payment.montant_total.toLocaleString('fr-FR')} FCFA)
+                                      </span>
+                                    </span>
+                                  )
+                                }
+                                
+                                // Sinon, afficher le montant total
+                                return `${payment.montant_total.toLocaleString('fr-FR')} FCFA`
+                              })() : '—'}
                             </td>
                           </tr>
                         ))

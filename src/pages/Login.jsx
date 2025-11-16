@@ -19,13 +19,24 @@ export default function Login() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
 
-  const handleControllerAccess = (e) => {
+  const handleControllerAccess = async (e) => {
     e.preventDefault()
-    // ScanQR est maintenant chargé de manière synchrone, donc pas de suspension
-    // Utiliser startTransition pour une navigation fluide
-    startTransition(() => {
-      navigate('/scan')
-    })
+    // Précharger ScanQR avant navigation pour éviter page blanche
+    try {
+      await import('./ScanQR')
+      // Attendre un peu pour que le composant soit chargé
+      await new Promise(resolve => setTimeout(resolve, 100))
+      // Navigation avec startTransition
+      startTransition(() => {
+        navigate('/scan')
+      })
+    } catch (error) {
+      console.error('Erreur préchargement ScanQR:', error)
+      // Navigation de toute façon
+      startTransition(() => {
+        navigate('/scan')
+      })
+    }
   }
 
   const handleSubmit = async (e) => {

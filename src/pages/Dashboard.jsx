@@ -121,42 +121,47 @@ export default function Dashboard() {
     },
   ]
 
-  const handleQuickAction = (action) => {
+  const handleQuickAction = async (action) => {
     switch (action) {
       case 'add-student':
-        // Précharger avant la navigation pour éviter page blanche
-        preloadStudents()
+        // Précharger AVANT de naviguer pour éviter page blanche
+        await preloadStudents()
+        // Attendre un peu pour que le composant soit chargé
+        await new Promise(resolve => setTimeout(resolve, 100))
         // Utiliser sessionStorage comme fallback
         sessionStorage.setItem('openStudentForm', 'true')
-        // Utiliser startTransition pour les lazy-loaded components (React 18)
+        // Navigation avec startTransition
         startTransition(() => {
           navigate('/students', { state: { openForm: true } })
         })
-        // Également dispatcher l'événement après un court délai
+        // Dispatcher l'événement après navigation
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('open-student-form'))
-        }, 200)
+        }, 300)
         break
       case 'add-payment':
-        // Précharger avant la navigation pour éviter page blanche
-        preloadPayments()
+        // Précharger AVANT de naviguer pour éviter page blanche
+        await preloadPayments()
+        // Attendre un peu pour que le composant soit chargé
+        await new Promise(resolve => setTimeout(resolve, 100))
         // Utiliser sessionStorage comme fallback
         sessionStorage.setItem('openPaymentForm', 'true')
-        // Utiliser startTransition pour les lazy-loaded components (React 18)
+        // Navigation avec startTransition
         startTransition(() => {
           navigate('/payments', { state: { openPayment: true } })
         })
-        // Également dispatcher l'événement après un court délai
+        // Dispatcher l'événement après navigation
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('open-payment-form'))
-        }, 200)
+        }, 300)
         break
       case 'generate-report':
         handleGenerateReport()
         break
       case 'scan-qr':
-        // ScanQR est maintenant chargé de manière synchrone, donc pas de suspension
-        // Utiliser startTransition pour une navigation fluide
+        // Précharger ScanQR avant navigation
+        await import('./ScanQR')
+        await new Promise(resolve => setTimeout(resolve, 100))
         startTransition(() => {
           navigate('/scan')
         })
