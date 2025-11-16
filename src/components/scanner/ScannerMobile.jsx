@@ -134,14 +134,10 @@ export default function ScannerMobile({ children }) {
             
             // Utiliser startTransition pour navigation fluide
             startTransition(() => {
-              // Nettoyer la session d'abord
-              sessionStorage.removeItem('controller_session')
-              
               // Essayer de retourner en arrière avec React Router
-              // Si pas d'historique, aller à la page de login
               navigate(-1)
               
-              // Fallback: si on est toujours sur la même page après 500ms, forcer la navigation
+              // Fallback: si on est toujours sur la même page après 500ms, forcer la navigation vers login
               setTimeout(() => {
                 const currentPath = window.location.pathname
                 if (currentPath === '/scan' || currentPath.startsWith('/scan')) {
