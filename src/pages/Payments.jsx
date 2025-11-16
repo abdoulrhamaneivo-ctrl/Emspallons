@@ -151,6 +151,7 @@ export default function Payments() {
               variant="primary" 
               className="flex items-center space-x-2"
               onClick={() => setShowSelectStudent(true)}
+              data-tour="add-payment-btn"
             >
               <Plus size={20} />
               <span>Nouveau paiement</span>
@@ -181,7 +182,7 @@ export default function Payments() {
           </AnimatedCard>
 
           {/* Payments List */}
-          <AnimatedCard delay={0.2} className="p-6">
+          <AnimatedCard delay={0.2} className="p-6" data-tour="payment-list">
             {loading ? (
               <LoadingSkeleton count={5} />
             ) : payments.length === 0 ? (

@@ -77,14 +77,21 @@ export default function Sidebar({ isOpen, onClose, isTablet }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+      <nav className="flex-1 overflow-y-auto p-4 space-y-2" data-tour="nav-sidebar">
         {navItems.map((item) => {
           const Icon = item.icon
+          const dataTourId = item.path === '/students' ? 'nav-students' : 
+                           item.path === '/payments' ? 'nav-payments' :
+                           item.path === '/rapports' || item.path === '/bilan-mensuel' ? 'nav-reports' :
+                           item.path === '/admin' ? 'nav-admin' :
+                           item.path === '/admin/scan-history' ? 'nav-scan-history' :
+                           item.path === '/scanner/historique' ? 'nav-history' : null
           return (
             <Link
               key={item.path}
               to={item.path}
               onClick={isTablet ? onClose : undefined}
+              data-tour={dataTourId}
               className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive(item.path)
                   ? 'bg-emsp-yellow text-emsp-green font-semibold'

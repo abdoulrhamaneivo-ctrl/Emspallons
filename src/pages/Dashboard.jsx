@@ -375,7 +375,7 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent mb-6">
               Actions rapides
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-tour="quick-actions">
               {(role === 'admin' || role === 'educator') && (
                 <>
                   <AnimatedButton 
@@ -383,6 +383,7 @@ export default function Dashboard() {
                     className="text-left p-4 h-full"
                     onClick={() => handleQuickAction('add-student')}
                     onMouseEnter={preloadStudents}
+                    data-tour="add-student-btn"
                   >
                     Ajouter un étudiant
                   </AnimatedButton>
@@ -391,6 +392,7 @@ export default function Dashboard() {
                     className="text-left p-4 h-full"
                     onClick={() => handleQuickAction('add-payment')}
                     onMouseEnter={preloadPayments}
+                    data-tour="add-payment-btn"
                   >
                     Enregistrer un paiement
                   </AnimatedButton>

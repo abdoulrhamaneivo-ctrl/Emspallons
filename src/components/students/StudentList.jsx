@@ -176,7 +176,7 @@ export default function StudentList() {
 
       {/* Barre de recherche et actions */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="flex-1 flex gap-2">
+        <div className="flex-1 flex gap-2" data-tour="student-search">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
@@ -211,6 +211,7 @@ export default function StudentList() {
               setShowForm(true)
             }}
             className="flex items-center space-x-2"
+            data-tour="add-student-btn"
           >
             <Plus size={20} />
             <span>Ajouter un étudiant</span>
@@ -356,7 +357,7 @@ export default function StudentList() {
           <p className="text-gray-500">Aucun étudiant trouvé</p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-tour="student-list">
           {filteredStudents.map((student) => (
             <Card
               key={student.id}
