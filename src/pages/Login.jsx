@@ -76,7 +76,7 @@ export default function Login() {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5, type: 'spring' }}
-            className="login-form bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl max-w-md w-full p-8 border-2 border-emsp-yellow/30 relative overflow-hidden z-10"
+            className="login-form bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl max-w-2xl w-full p-8 md:p-10 border-2 border-emsp-yellow/30 relative overflow-hidden z-10"
           >
             {/* Decorative background elements */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-emsp-yellow/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>

@@ -27,8 +27,16 @@ export default function QuickLoginModal({ isOpen, onClose, profile, onSuccess })
       const { error: signInError } = await signIn(profile.email, password)
       if (signInError) throw signInError
 
-      // Afficher le toast et naviguer immédiatement (non bloquant)
+      // Afficher le toast
       toast.success(`Bienvenue, ${profile.name} !`, { duration: 2000 })
+      
+      // Précharger Dashboard avant navigation
+      try {
+        await import('../../pages/Dashboard')
+        await new Promise(resolve => setTimeout(resolve, 150))
+      } catch (error) {
+        logger.error('Erreur préchargement Dashboard', error)
+      }
       
       // Fermer la modal
       onSuccess()

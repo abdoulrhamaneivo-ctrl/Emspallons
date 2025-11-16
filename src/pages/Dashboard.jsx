@@ -132,6 +132,50 @@ export default function Dashboard() {
   ]
 
   const handleQuickAction = async (action) => {
+    // Précharger les composants nécessaires avant navigation
+    try {
+      if (action === 'add-student') {
+        await preloadStudents()
+        await new Promise(resolve => setTimeout(resolve, 150))
+        startTransition(() => {
+          navigate('/students')
+        })
+      } else if (action === 'add-payment') {
+        await preloadPayments()
+        await new Promise(resolve => setTimeout(resolve, 150))
+        startTransition(() => {
+          navigate('/payments')
+        })
+      } else if (action === 'scan-qr') {
+        await import('./ScanQR')
+        await new Promise(resolve => setTimeout(resolve, 150))
+        startTransition(() => {
+          navigate('/scan')
+        })
+      } else if (action === 'generate-report') {
+        handleGenerateReport()
+        return
+      }
+    } catch (error) {
+      logger.error('Erreur préchargement composant', error)
+      // Navigation de toute façon
+      if (action === 'add-student') {
+        startTransition(() => {
+          navigate('/students')
+        })
+      } else if (action === 'add-payment') {
+        startTransition(() => {
+          navigate('/payments')
+        })
+      } else if (action === 'scan-qr') {
+        startTransition(() => {
+          navigate('/scan')
+        })
+      }
+    }
+  }
+
+  const handleQuickActionOld = async (action) => {
     switch (action) {
       case 'add-student':
         // Précharger AVANT de naviguer pour éviter page blanche

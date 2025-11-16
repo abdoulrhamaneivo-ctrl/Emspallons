@@ -68,8 +68,8 @@ export default function RecentProfiles({ onUseOtherAccount }) {
   return (
     <>
       <div className="mb-6">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Connexions récentes</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <h3 className="text-base font-semibold text-gray-800 mb-4">Connexions récentes</h3>
+        <div className="grid grid-cols-1 gap-4">
           {profiles.slice(0, 3).map((profile, index) => (
             <motion.div
               key={profile.id}
@@ -79,40 +79,40 @@ export default function RecentProfiles({ onUseOtherAccount }) {
             >
               <AnimatedCard
                 delay={0}
-                className="p-4 cursor-pointer hover:border-emsp-lightGreen border-2 border-transparent transition-all"
+                className="p-5 cursor-pointer hover:border-emsp-lightGreen border-2 border-transparent transition-all shadow-md hover:shadow-lg"
                 onClick={() => handleQuickLogin(profile)}
               >
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emsp-yellow to-emsp-lightGreen flex items-center justify-center text-white font-bold text-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="relative flex-shrink-0">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emsp-yellow to-emsp-lightGreen flex items-center justify-center text-white font-bold text-xl shadow-lg">
                       {getInitials(profile.name)}
                     </div>
                     <button
                       onClick={(e) => handleRemoveProfile(e, profile.id)}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
                       title="Supprimer"
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-emsp-green truncate">{profile.name}</p>
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(profile.role)}`}>
+                    <p className="font-bold text-lg text-emsp-green mb-1">{profile.name}</p>
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(profile.role)}`}>
                       {getRoleLabel(profile.role)}
                     </span>
                   </div>
-                </div>
-                <div className="mt-3">
-                  <AnimatedButton
-                    variant="outline"
-                    className="w-full text-sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleQuickLogin(profile)
-                    }}
-                  >
-                    Connexion rapide
-                  </AnimatedButton>
+                  <div className="flex-shrink-0">
+                    <AnimatedButton
+                      variant="primary"
+                      className="px-6 py-2.5 text-base font-semibold whitespace-nowrap"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleQuickLogin(profile)
+                      }}
+                    >
+                      Connexion →
+                    </AnimatedButton>
+                  </div>
                 </div>
               </AnimatedCard>
             </motion.div>
