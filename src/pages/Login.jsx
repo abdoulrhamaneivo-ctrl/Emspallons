@@ -76,7 +76,10 @@ export default function Login() {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5, type: 'spring' }}
-            className="login-form bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl max-w-2xl w-full p-8 md:p-10 border-2 border-emsp-yellow/30 relative overflow-hidden z-10"
+            className="login-form bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl max-w-3xl w-full p-10 md:p-12 border-2 border-emsp-yellow/30 relative overflow-hidden z-10 card-enter"
+            style={{
+              animation: 'slideInForm 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            }}
           >
             {/* Decorative background elements */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-emsp-yellow/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
@@ -200,14 +203,17 @@ export default function Login() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.8 }}
-                className="mt-6"
+                className="mt-8"
               >
                 <AnimatedButton
                   onClick={handleControllerAccess}
                   variant="outline"
-                  className="w-full flex items-center justify-center space-x-2 bg-emsp-green hover:bg-emsp-lightGreen text-white border-emsp-green"
+                  className="w-full flex items-center justify-center space-x-2 bg-emsp-green hover:bg-emsp-lightGreen text-white border-emsp-green shadow-lg hover:shadow-xl text-base font-semibold py-3 button-pulse"
+                  style={{
+                    animation: 'fadeInUp 0.6s ease-out 0.8s both'
+                  }}
                 >
-                  <Shield size={18} />
+                  <Shield size={20} />
                   <span>👮 Accès Contrôleur</span>
                 </AnimatedButton>
               </motion.div>

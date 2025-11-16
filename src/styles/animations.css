@@ -146,6 +146,18 @@ select:focus {
   animation: fadeIn 0.4s ease-out forwards;
 }
 
+/* Animation fadeInUp pour les boutons */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Animation de slide up */
 @keyframes slideUp {
   from {
@@ -355,6 +367,18 @@ select:focus {
 
 .slide-in-right {
   animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Animation améliorée pour le formulaire de login */
+@keyframes slideInForm {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Animation de zoom in */
