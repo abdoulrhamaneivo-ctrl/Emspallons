@@ -89,6 +89,63 @@ const hexToRgb = (hex) => {
 }
 
 /**
+ * Helper pour dessiner une ligne horizontale (hr) dans le PDF
+ * Cette fonction est utilisée par le bundler et doit être sécurisée
+ * @param {jsPDF} doc - Document jsPDF
+ * @param {number} y - Position Y de la ligne
+ * @param {Array|Object|string} color - Couleur (RGB array, RGB object, ou hex string)
+ * @param {number} lineWidth - Épaisseur de la ligne (défaut: 1)
+ * @param {number} xStart - Position X de début (défaut: margin)
+ * @param {number} xEnd - Position X de fin (défaut: pageWidth - margin)
+ */
+export const hr = (doc, y, color = [0, 0, 0], lineWidth = 1, xStart = null, xEnd = null) => {
+  try {
+    // Normaliser la couleur en tableau RGB [r, g, b]
+    let rgbColor = [0, 0, 0] // Par défaut : noir
+    
+    if (Array.isArray(color)) {
+      // Déjà un tableau [r, g, b]
+      rgbColor = color.map(c => Math.max(0, Math.min(255, Math.round(c || 0))))
+    } else if (color && typeof color === 'object' && 'r' in color && 'g' in color && 'b' in color) {
+      // Objet {r, g, b}
+      rgbColor = [
+        Math.max(0, Math.min(255, Math.round(color.r || 0))),
+        Math.max(0, Math.min(255, Math.round(color.g || 0))),
+        Math.max(0, Math.min(255, Math.round(color.b || 0)))
+      ]
+    } else if (typeof color === 'string' && color.startsWith('#')) {
+      // Chaîne hex
+      const rgb = hexToRgb(color)
+      if (rgb) {
+        rgbColor = [rgb.r, rgb.g, rgb.b]
+      }
+    }
+    
+    // S'assurer que toutes les valeurs sont valides
+    rgbColor = rgbColor.map(c => Math.max(0, Math.min(255, Math.round(c || 0))))
+    
+    // Obtenir les dimensions de la page si non fournies
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 15
+    const startX = xStart !== null ? xStart : margin
+    const endX = xEnd !== null ? xEnd : (pageWidth - margin)
+    
+    // Dessiner la ligne
+    doc.setDrawColor(rgbColor[0], rgbColor[1], rgbColor[2])
+    doc.setLineWidth(lineWidth)
+    doc.line(startX, y, endX, y)
+  } catch (error) {
+    // En cas d'erreur, dessiner une ligne noire par défaut
+    console.error('Erreur dans hr():', error)
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 15
+    doc.setDrawColor(0, 0, 0)
+    doc.setLineWidth(1)
+    doc.line(margin, y, pageWidth - margin, y)
+  }
+}
+
+/**
  * Génère un reçu PDF moderne et professionnel avec design amélioré
  * @param {Object} payment - Données du paiement
  * @param {Object} student - Données de l'étudiant
@@ -383,9 +440,7 @@ export const generateReceiptPDF = async (payment, student) => {
     // ============================================
     
     // Séparateur décoratif
-    doc.setDrawColor(yRgb.r, yRgb.g, yRgb.b)
-    doc.setLineWidth(2)
-    doc.line(margin, yPosition, pageWidth - margin, yPosition)
+    hr(doc, yPosition, [yRgb.r, yRgb.g, yRgb.b], 2, margin, pageWidth - margin)
     
     yPosition += 8
   
@@ -449,9 +504,7 @@ export const generateReceiptPDF = async (payment, student) => {
     doc.text('L\'Administration EMSP', pageWidth - margin, signatureY, { align: 'right' })
     
     // Ligne de signature avec style
-    doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.setLineWidth(1)
-    doc.line(pageWidth - margin - 50, signatureY + 3, pageWidth - margin, signatureY + 3)
+    hr(doc, signatureY + 3, [gRgb.r, gRgb.g, gRgb.b], 1, pageWidth - margin - 50, pageWidth - margin)
   
     // Numéro de page (si plusieurs pages)
     doc.setFontSize(8)
