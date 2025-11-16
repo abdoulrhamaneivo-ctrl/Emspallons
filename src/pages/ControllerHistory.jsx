@@ -29,8 +29,15 @@ export default function ControllerHistory() {
     // Récupérer la session contrôleur
     const stored = sessionStorage.getItem('controller_session')
     if (!stored) {
-      startTransition(() => {
-        navigate('/scan')
+      // Précharger ScanQR avant navigation
+      import('./ScanQR').then(() => {
+        startTransition(() => {
+          navigate('/scan')
+        })
+      }).catch(() => {
+        startTransition(() => {
+          navigate('/scan')
+        })
       })
       return
     }
@@ -39,8 +46,15 @@ export default function ControllerHistory() {
       const parsed = JSON.parse(stored)
       setController(parsed.controller_session)
     } catch (e) {
-      startTransition(() => {
-        navigate('/scan')
+      // Précharger ScanQR avant navigation
+      import('./ScanQR').then(() => {
+        startTransition(() => {
+          navigate('/scan')
+        })
+      }).catch(() => {
+        startTransition(() => {
+          navigate('/scan')
+        })
       })
     }
   }, [navigate])
@@ -180,12 +194,32 @@ export default function ControllerHistory() {
               <div className="flex items-center space-x-4">
                 <AnimatedButton
                   variant="outline"
-                  onClick={() => {
-                    startTransition(() => {
-                      navigate('/scan')
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    
+                    // Vibration pour feedback
+                    if ('vibrate' in navigator) {
+                      navigator.vibrate(10)
+                    }
+                    
+                    // Précharger ScanQR avant navigation
+                    import('./ScanQR').then(() => {
+                      startTransition(() => {
+                        navigate('/scan')
+                      })
+                    }).catch(() => {
+                      startTransition(() => {
+                        navigate('/scan')
+                      })
                     })
                   }}
-                  className="flex items-center space-x-2"
+                  className="flex items-center space-x-2 touch-manipulation"
+                  style={{ 
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation'
+                  }}
+                  type="button"
                 >
                   <ArrowLeft size={20} />
                   <span>Retour</span>

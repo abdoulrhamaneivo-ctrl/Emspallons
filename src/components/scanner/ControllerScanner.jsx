@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { startTransition } from 'react'
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode'
 import { supabase } from '../../lib/supabase'
 import { CheckCircle, XCircle, AlertCircle, LogOut, History, RefreshCcw } from 'lucide-react'
@@ -8,6 +9,16 @@ import { STATUTS_SCAN, STATUTS_PAIEMENT } from '../../lib/constants'
 import toast from 'react-hot-toast'
 import logger from '../../lib/logger'
 import ControllerLogin from './ControllerLogin'
+
+// Précharger ControllerHistory pour éviter pages blanches
+let ControllerHistoryPreloaded = false
+const preloadControllerHistory = () => {
+  if (ControllerHistoryPreloaded) return
+  ControllerHistoryPreloaded = true
+  import('../../pages/ControllerHistory').catch(() => {
+    ControllerHistoryPreloaded = false
+  })
+}
 
 export default function ControllerScanner() {
   const navigate = useNavigate()
@@ -570,7 +581,13 @@ export default function ControllerScanner() {
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
-              onClick={() => navigate('/scanner/historique')}
+              onClick={() => {
+                preloadControllerHistory()
+                startTransition(() => {
+                  navigate('/scanner/historique')
+                })
+              }}
+              onMouseEnter={preloadControllerHistory}
               className="bg-white/20 hover:bg-white/30 text-white border-white"
             >
               <History size={18} className="mr-2" />
