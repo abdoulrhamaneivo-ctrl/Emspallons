@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, startTransition } from 'react'
 import Joyride, { STATUS, EVENTS, ACTIONS } from 'react-joyride'
-import { useLocation, useNavigate, startTransition } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const TOUR_STORAGE_KEY = 'emsp_onboarding_completed'
