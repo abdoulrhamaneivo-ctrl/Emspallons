@@ -28,9 +28,9 @@ function Input({
       <input
         id={inputId}
         className={cn(
-          'w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-emsp-yellow focus:border-transparent transition-colors',
-          error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300',
-          props.disabled && 'bg-gray-100 cursor-not-allowed',
+          'w-full px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-emsp-yellow focus:border-transparent transition-all duration-300',
+          error ? 'border-red-500 focus:ring-red-500 error' : 'border-gray-300 hover:border-emsp-lightGreen',
+          props.disabled && 'bg-gray-100 cursor-not-allowed opacity-60',
           className
         )}
         aria-label={ariaLabel || label}
@@ -42,7 +42,7 @@ function Input({
       {error && (
         <p 
           id={errorId}
-          className="mt-1 text-sm text-red-600" 
+          className="error-message mt-1 text-sm text-red-600" 
           role="alert"
           aria-live="polite"
         >

@@ -1,0 +1,414 @@
+/* ============================================
+   ANIMATIONS DE FORMULAIRES - EMSP TRANSPORT
+   Adaptées au style EMSP (jaune/vert)
+   ============================================ */
+
+/* Container principal avec animations fluides */
+.form-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 50px;
+  min-height: calc(100vh - 8rem);
+  position: relative;
+}
+
+/* Formulaire principal avec animation d'entrée */
+.register-form,
+.login-form {
+  background: white;
+  padding: 40px 50px;
+  border-radius: 20px;
+  width: 350px;
+  max-width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(45, 80, 22, 0.15);
+  border: 2px solid rgba(253, 185, 19, 0.2);
+  position: relative;
+  overflow: hidden;
+  animation: slideInForm 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Animation d'entrée du formulaire */
+@keyframes slideInForm {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Titre du formulaire */
+.register-form h1,
+.login-form h1 {
+  color: #2D5016;
+  margin-bottom: 10px;
+  font-size: 26px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #FDB913 0%, #7CB342 50%, #2D5016 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInDown 0.6s ease-out 0.2s both;
+}
+
+/* Paragraphe du formulaire */
+.register-form p,
+.login-form p {
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 25px;
+  animation: fadeInUp 0.6s ease-out 0.3s both;
+}
+
+/* Labels avec style moderne */
+.register-form label,
+.login-form label,
+label {
+  display: block;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: #333;
+  transition: all 0.3s ease;
+}
+
+/* Labels avec focus effect */
+.register-form label:focus-within,
+.login-form label:focus-within,
+label:focus-within {
+  color: #2D5016;
+  transform: translateX(2px);
+}
+
+/* Inputs avec animations fluides */
+.register-form input,
+.login-form input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: white;
+  outline: none;
+}
+
+/* Input focus avec couleur EMSP */
+.register-form input:focus,
+.login-form input:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #FDB913;
+  box-shadow: 0 0 0 3px rgba(253, 185, 19, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Input hover */
+.register-form input:hover,
+.login-form input:hover,
+input:hover:not(:disabled) {
+  border-color: #7CB342;
+}
+
+/* Illustration/image (pour pages avec illustrations) */
+.illustration img {
+  width: 250px;
+  height: auto;
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Animation de flottement pour illustrations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Boutons avec animations */
+.register-form button,
+.login-form button,
+.form-button {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #FDB913 0%, #7CB342 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(253, 185, 19, 0.3);
+  animation: fadeInUp 0.6s ease-out 0.6s both;
+}
+
+/* Bouton hover */
+.register-form button:hover,
+.login-form button:hover,
+.form-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(253, 185, 19, 0.4);
+  background: linear-gradient(135deg, #FFC933 0%, #8BC34A 100%);
+}
+
+/* Bouton active */
+.register-form button:active,
+.login-form button:active,
+.form-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(253, 185, 19, 0.3);
+}
+
+/* Bouton disabled */
+.register-form button:disabled,
+.login-form button:disabled,
+.form-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Animations d'apparition */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Input avec erreur */
+.register-form input.error,
+.login-form input.error,
+input.error {
+  border-color: #ef4444;
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Animation de secousse pour erreurs */
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+/* Message d'erreur */
+.error-message {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 5px;
+  text-align: left;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Message de succès */
+.success-message {
+  color: #7CB342;
+  font-size: 12px;
+  margin-top: 5px;
+  text-align: left;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Loading spinner */
+.form-loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Groupes de champs avec animation séquentielle */
+.form-group {
+  margin-bottom: 20px;
+  animation: fadeInUp 0.6s ease-out both;
+}
+
+.form-group:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.form-group:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.form-group:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.form-group:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+.form-group:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+/* Effet de focus sur le container */
+.register-form:focus-within,
+.login-form:focus-within {
+  box-shadow: 0 20px 60px rgba(253, 185, 19, 0.2);
+  border-color: rgba(253, 185, 19, 0.4);
+}
+
+/* Responsive - Mobile */
+@media (max-width: 768px) {
+  .form-container {
+    flex-direction: column;
+    gap: 30px;
+    padding: 20px;
+  }
+
+  .register-form,
+  .login-form {
+    width: 100%;
+    max-width: 400px;
+    padding: 30px 25px;
+  }
+
+  .illustration img {
+    width: 200px;
+  }
+}
+
+/* Responsive - Très petits écrans */
+@media (max-width: 480px) {
+  .register-form,
+  .login-form {
+    padding: 25px 20px;
+    border-radius: 15px;
+  }
+
+  .register-form h1,
+  .login-form h1 {
+    font-size: 22px;
+  }
+
+  .register-form p,
+  .login-form p {
+    font-size: 13px;
+  }
+}
+
+/* Animation de transition entre états */
+.form-transition-enter {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.form-transition-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.3s ease-out;
+}
+
+.form-transition-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.form-transition-exit-active {
+  opacity: 0;
+  transform: translateX(20px);
+  transition: all 0.3s ease-in;
+}
+
+/* Badge/indicateur de statut */
+.form-status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.form-status-badge.success {
+  background: rgba(124, 179, 66, 0.1);
+  color: #7CB342;
+}
+
+.form-status-badge.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Progress bar pour formulaires multi-étapes */
+.form-progress {
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.form-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #FDB913 0%, #7CB342 100%);
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
+  animation: progressShimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes progressShimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+

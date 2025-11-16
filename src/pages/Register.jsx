@@ -203,7 +203,7 @@ export default function Register() {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5, type: 'spring' }}
-            className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-2xl max-w-md w-full p-8 border border-white/20 relative z-10"
+            className="register-form bg-white/90 backdrop-blur-lg rounded-2xl shadow-2xl max-w-md w-full p-8 border border-white/20 relative z-10"
           >
             <div className="text-center mb-8">
               <motion.div
@@ -237,6 +237,7 @@ export default function Register() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.5 }}
+                className="form-group"
               >
                 <Input
                   label="Nom complet *"
@@ -255,6 +256,7 @@ export default function Register() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.6 }}
+                className="form-group"
               >
                 <Input
                   label="Email *"
@@ -274,6 +276,7 @@ export default function Register() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.7 }}
+                className="form-group"
               >
                 <Input
                   label="Mot de passe *"
@@ -294,6 +297,7 @@ export default function Register() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.8 }}
+                className="form-group"
               >
                 <Input
                   label="Confirmer le mot de passe *"
