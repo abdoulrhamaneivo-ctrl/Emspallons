@@ -81,19 +81,29 @@ function AppRoutes() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    // Précharger les composants critiques de manière optimisée
     const schedulePrefetch = () => {
       const task = () => {
-        criticalPrefetchComponents.forEach((Component) => {
-          Component.preload?.()
+        // Précharger les composants critiques en parallèle mais avec un délai échelonné
+        criticalPrefetchComponents.forEach((Component, index) => {
+          setTimeout(() => {
+            try {
+              Component.preload?.()
+            } catch (error) {
+              // Erreur non bloquante lors du préchargement
+            }
+          }, index * 100) // Délai échelonné de 100ms entre chaque composant
         })
       }
 
+      // Utiliser requestIdleCallback si disponible, sinon setTimeout
       if ('requestIdleCallback' in window) {
-        const id = window.requestIdleCallback(task, { timeout: 2000 })
+        const id = window.requestIdleCallback(task, { timeout: 1500 })
         return () => window.cancelIdleCallback?.(id)
       }
 
-      const timeoutId = window.setTimeout(task, 1000)
+      // Fallback pour navigateurs sans support requestIdleCallback
+      const timeoutId = window.setTimeout(task, 800)
       return () => window.clearTimeout(timeoutId)
     }
 

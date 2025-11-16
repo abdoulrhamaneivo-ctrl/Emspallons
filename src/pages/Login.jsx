@@ -10,6 +10,7 @@ import PageTransition from '../components/ui/PageTransition'
 import { FloatingShapes, GradientOrb } from '../components/ui/DecorativeElements'
 import RecentProfiles from '../components/auth/RecentProfiles'
 import { Shield } from 'lucide-react'
+import logger from '../lib/logger'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -31,7 +32,7 @@ export default function Login() {
         navigate('/scan')
       })
     } catch (error) {
-      console.error('Erreur préchargement ScanQR:', error)
+      logger.error('Erreur préchargement ScanQR', error)
       // Navigation de toute façon
       startTransition(() => {
         navigate('/scan')

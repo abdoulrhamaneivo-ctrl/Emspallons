@@ -20,33 +20,66 @@ export default function AnimatedButton({
   const [ripple, setRipple] = useState(null)
 
   const handleClick = (e) => {
-    if (disabled) return
+    if (disabled) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
 
+    // Support touch et mouse events
     const button = e.currentTarget
     const rect = button.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    const touch = e.touches?.[0] || e.changedTouches?.[0]
+    const x = (touch?.clientX || e.clientX) - rect.left
+    const y = (touch?.clientY || e.clientY) - rect.top
 
     setRipple({ x, y })
     setTimeout(() => setRipple(null), 600)
 
-    if (onClick) onClick(e)
+    if (onClick) {
+      // Prévenir double clic sur mobile
+      e.preventDefault()
+      onClick(e)
+    }
+  }
+
+  const handleTouchStart = (e) => {
+    // Prévenir le comportement par défaut sur touch
+    if (disabled) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    // Note: on laisse onClick gérer le clic pour éviter double appel
   }
 
   return (
     <motion.button
       type={type}
       onClick={handleClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={(e) => {
+        // Permettre le clic tactile sans double appel
+        if (!disabled && onClick && e.cancelable) {
+          e.preventDefault()
+        }
+      }}
       disabled={disabled}
       whileHover={!disabled ? { scale: 1.02 } : {}}
       whileTap={!disabled ? { scale: 0.98 } : {}}
       className={`
         relative overflow-hidden px-6 py-3 rounded-xl font-semibold
         transition-all duration-300
+        touch-manipulation
         ${variants[variant]}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${className}
       `}
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
+        ...props.style
+      }}
       {...props}
     >
       {ripple && (

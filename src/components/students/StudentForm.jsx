@@ -163,8 +163,8 @@ export default function StudentForm({ student, onClose, onSuccess }) {
       )
       onSuccess?.()
     } catch (error) {
+      logger.error('Erreur création/modification étudiant', error)
       toast.error(error.message || 'Une erreur est survenue')
-      console.error(error)
     } finally {
       setLoading(false)
     }

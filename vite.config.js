@@ -4,6 +4,23 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks pour optimiser le chargement
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['framer-motion', 'lucide-react', 'react-hot-toast'],
+          'chart-vendor': ['recharts', 'react-countup'],
+          'pdf-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas'],
+          'qr-vendor': ['html5-qrcode', 'qrcode', 'qrcode.react'],
+          'excel-vendor': ['xlsx'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000, // Augmenter la limite pour éviter trop d'avertissements
+  },
   plugins: [
     react(),
     VitePWA({

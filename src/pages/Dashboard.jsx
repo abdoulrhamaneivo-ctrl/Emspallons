@@ -25,28 +25,38 @@ import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Cart
 let StudentsPreloaded = false
 let PaymentsPreloaded = false
 
-const preloadStudents = () => {
-  if (StudentsPreloaded) return
+const preloadStudents = async () => {
+  if (StudentsPreloaded) return Promise.resolve()
   StudentsPreloaded = true
-  import('./Students').catch(() => {
+  try {
+    await import('./Students')
+  } catch (error) {
     StudentsPreloaded = false
-  })
+    throw error
+  }
 }
 
-const preloadPayments = () => {
-  if (PaymentsPreloaded) return
+const preloadPayments = async () => {
+  if (PaymentsPreloaded) return Promise.resolve()
   PaymentsPreloaded = true
-  import('./Payments').catch(() => {
+  try {
+    await import('./Payments')
+  } catch (error) {
     PaymentsPreloaded = false
-  })
+    throw error
+  }
 }
 
 // Précharger immédiatement au chargement du Dashboard
 if (typeof window !== 'undefined') {
   // Précharger après un court délai pour ne pas bloquer le rendu initial
   setTimeout(() => {
-    preloadStudents()
-    preloadPayments()
+    preloadStudents().catch(() => {
+      // Erreur non bloquante
+    })
+    preloadPayments().catch(() => {
+      // Erreur non bloquante
+    })
   }, 500)
 }
 
@@ -280,7 +290,7 @@ export default function Dashboard() {
       if (error) throw error
       setRecentReminders(data || [])
     } catch (error) {
-      console.error('Erreur récupération rappels récents:', error)
+      logger.error('Erreur récupération rappels récents', error)
     } finally {
       setLoadingReminders(false)
     }
@@ -313,7 +323,7 @@ export default function Dashboard() {
       
       toast.success('Rapport généré avec succès')
     } catch (error) {
-      console.error('Erreur lors de la génération du rapport:', error)
+      logger.error('Erreur lors de la génération du rapport', error)
       toast.error('Erreur lors de la génération du rapport')
     }
   }

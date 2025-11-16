@@ -2,6 +2,7 @@ import { useEffect, useRef, startTransition, useState, useCallback } from 'react
 import { useBreakpoint } from '../../hooks/useBreakpoint'
 import { LogOut, History } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import logger from '../../lib/logger'
 
 // Précharger ControllerHistory pour éviter pages blanches
 let ControllerHistoryPreloaded = false
@@ -43,7 +44,8 @@ export default function ScannerMobile({ children }) {
           await screen.orientation.lock('landscape')
         }
       } catch (error) {
-        console.log('Orientation lock not supported:', error)
+        // Orientation lock non supporté, continue sans erreur
+        logger.debug('Orientation lock not supported', error)
       }
     }
 
@@ -68,7 +70,8 @@ export default function ScannerMobile({ children }) {
           screen.orientation.unlock()
         }
       } catch (error) {
-        console.log('Orientation unlock error:', error)
+        // Orientation unlock erreur non bloquante
+        logger.debug('Orientation unlock error', error)
       }
       delete window.scannerVibrate
     }

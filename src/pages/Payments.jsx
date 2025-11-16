@@ -17,6 +17,7 @@ import ReceiptPreviewModal from '../components/payments/ReceiptPreviewModal'
 import { useStudents } from '../hooks/useStudents'
 import { generateReceiptPDF, downloadReceipt } from '../services/receiptService'
 import { formatDate } from '../lib/utils'
+import logger from '../lib/logger'
 
 export default function Payments() {
   const location = useLocation()
@@ -85,8 +86,8 @@ export default function Payments() {
       if (error) throw error
       setPayments(data || [])
     } catch (error) {
+      logger.error('Erreur lors du chargement des paiements', error)
       toast.error('Erreur lors du chargement des paiements')
-      console.error(error)
     } finally {
       setLoading(false)
     }
@@ -106,7 +107,7 @@ export default function Payments() {
       downloadReceipt(doc, studentName, payment.created_at || new Date().toISOString())
       toast.success('Reçu téléchargé')
     } catch (error) {
-      console.error('Erreur lors du téléchargement du reçu:', error)
+      logger.error('Erreur lors du téléchargement du reçu', error)
       toast.error('Erreur lors de la génération du reçu')
     }
   }
@@ -123,7 +124,7 @@ export default function Payments() {
       setSelectedPaymentStudent(student)
       setShowReceiptPreview(true)
     } catch (error) {
-      console.error('Erreur lors de l\'ouverture de la prévisualisation:', error)
+      logger.error('Erreur lors de l\'ouverture de la prévisualisation', error)
       toast.error('Erreur lors de l\'ouverture de la prévisualisation')
     }
   }

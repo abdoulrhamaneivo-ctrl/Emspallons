@@ -3,6 +3,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import { QrCode, CheckCircle, XCircle } from 'lucide-react'
 import { Card, Badge } from '../ui'
 import toast from 'react-hot-toast'
+import logger from '../../lib/logger'
 
 export default function QRScanner({ onScanSuccess, onScanError }) {
   const [scanning, setScanning] = useState(false)
@@ -13,7 +14,9 @@ export default function QRScanner({ onScanSuccess, onScanError }) {
   useEffect(() => {
     return () => {
       if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop().catch(console.error)
+        html5QrCodeRef.current.stop().catch((err) => {
+          // Erreur non bloquante lors du cleanup
+        })
       }
     }
   }, [])
@@ -42,7 +45,7 @@ export default function QRScanner({ onScanSuccess, onScanError }) {
         }
       )
     } catch (err) {
-      console.error('Error starting scanner:', err)
+      logger.error('Error starting scanner', err)
       toast.error('Erreur lors du démarrage du scanner')
       setScanning(false)
     }
@@ -54,7 +57,7 @@ export default function QRScanner({ onScanSuccess, onScanError }) {
         await html5QrCodeRef.current.stop()
         html5QrCodeRef.current = null
       } catch (err) {
-        console.error('Error stopping scanner:', err)
+        logger.debug('Error stopping scanner', err)
       }
     }
     setScanning(false)
