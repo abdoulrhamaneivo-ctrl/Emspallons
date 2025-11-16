@@ -7,6 +7,7 @@ import { isValidPhone, formatPhone } from '../../lib/utils'
 import { formatPhoneNumber, validatePhoneNumber, detectCountry, getAvailableCountries } from '../../lib/phoneFormatter'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
+import logger from '../../lib/logger'
 
 export default function StudentForm({ student, onClose, onSuccess }) {
   const { createStudent, updateStudent } = useStudents()

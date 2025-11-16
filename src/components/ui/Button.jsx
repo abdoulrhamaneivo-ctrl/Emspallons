@@ -12,7 +12,7 @@ function Button({
   'aria-label': ariaLabel,
   ...props
 }) {
-  const baseStyles = 'font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emsp-yellow focus:ring-offset-2'
+  const baseStyles = 'font-semibold rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emsp-yellow focus:ring-offset-2 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:scale-95'
   
   const variants = {
     primary: 'bg-emsp-yellow text-emsp-green hover:bg-yellow-500',
