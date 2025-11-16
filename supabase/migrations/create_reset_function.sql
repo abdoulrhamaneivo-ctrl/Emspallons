@@ -5,7 +5,7 @@
 -- Fonction de réinitialisation complète de la base de données
 -- ⚠️ DANGER : Supprime TOUTES les données sauf les admins
 
-CREATEur au tableau de bordur au tableau de bord OR REPLACE FUNCTION reset_database_except_admins()
+CREATE OR REPLACE FUNCTION reset_database_except_admins()
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER
