@@ -175,55 +175,6 @@ export default function Dashboard() {
     }
   }
 
-  const handleQuickActionOld = async (action) => {
-    switch (action) {
-      case 'add-student':
-        // Précharger AVANT de naviguer pour éviter page blanche
-        await preloadStudents()
-        // Attendre un peu pour que le composant soit chargé
-        await new Promise(resolve => setTimeout(resolve, 100))
-        // Utiliser sessionStorage comme fallback
-        sessionStorage.setItem('openStudentForm', 'true')
-        // Navigation avec startTransition
-        startTransition(() => {
-          navigate('/students', { state: { openForm: true } })
-        })
-        // Dispatcher l'événement après navigation
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('open-student-form'))
-        }, 300)
-        break
-      case 'add-payment':
-        // Précharger AVANT de naviguer pour éviter page blanche
-        await preloadPayments()
-        // Attendre un peu pour que le composant soit chargé
-        await new Promise(resolve => setTimeout(resolve, 100))
-        // Utiliser sessionStorage comme fallback
-        sessionStorage.setItem('openPaymentForm', 'true')
-        // Navigation avec startTransition
-        startTransition(() => {
-          navigate('/payments', { state: { openPayment: true } })
-        })
-        // Dispatcher l'événement après navigation
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('open-payment-form'))
-        }, 300)
-        break
-      case 'generate-report':
-        handleGenerateReport()
-        break
-      case 'scan-qr':
-        // Précharger ScanQR avant navigation
-        await import('./ScanQR')
-        await new Promise(resolve => setTimeout(resolve, 100))
-        startTransition(() => {
-          navigate('/scan')
-        })
-        break
-      default:
-        break
-    }
-  }
 
   useEffect(() => {
     // Charger les données de manière progressive (non bloquant)
