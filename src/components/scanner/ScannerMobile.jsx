@@ -74,23 +74,42 @@ export default function ScannerMobile({ children }) {
       {/* Contrôles en bas (zone safe) */}
       <div className="scanner-controls flex justify-center items-center gap-4">
         <button
-          onClick={() => navigate('/scanner/historique')}
-          className="scanner-button bg-emsp-green text-white flex items-center justify-center gap-2"
-          style={{ minWidth: '48px', minHeight: '48px' }}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            navigate('/scanner/historique')
+          }}
+          className="scanner-button bg-emsp-green hover:bg-emsp-lightGreen active:bg-emsp-green/90 text-white flex items-center justify-center gap-2 touch-manipulation"
+          style={{ 
+            minWidth: '48px', 
+            minHeight: '48px',
+            WebkitTapHighlightColor: 'transparent',
+            touchAction: 'manipulation'
+          }}
+          type="button"
         >
           <History size={20} />
           <span className="hidden sm:inline">Historique</span>
         </button>
         <button
-          onClick={() => {
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
             sessionStorage.removeItem('controller_session')
-            navigate('/scan')
+            // Retourner à la page de login contrôleur
+            navigate('/scan', { replace: true })
           }}
-          className="scanner-button bg-red-600 text-white flex items-center justify-center gap-2"
-          style={{ minWidth: '48px', minHeight: '48px' }}
+          className="scanner-button bg-red-600 hover:bg-red-700 active:bg-red-800 text-white flex items-center justify-center gap-2 touch-manipulation"
+          style={{ 
+            minWidth: '48px', 
+            minHeight: '48px',
+            WebkitTapHighlightColor: 'transparent',
+            touchAction: 'manipulation'
+          }}
+          type="button"
         >
           <LogOut size={20} />
-          <span className="hidden sm:inline">Déconnexion</span>
+          <span className="hidden sm:inline">Retour</span>
         </button>
       </div>
     </div>

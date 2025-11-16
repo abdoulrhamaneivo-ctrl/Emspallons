@@ -111,8 +111,13 @@ export default function ControllerLogin({ onLoginSuccess }) {
               }}
               required
               pattern="[A-Z0-9]{4}-[A-Z0-9]{4}"
-              className="w-full px-4 py-3 border-2 border-emsp-yellow/30 rounded-xl focus:ring-2 focus:ring-emsp-yellow focus:border-emsp-yellow transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-emsp-lightGreen font-mono text-center text-lg"
+              inputMode="text"
+              autoComplete="username"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              className="w-full px-4 py-3 border-2 border-emsp-yellow/30 rounded-xl focus:ring-2 focus:ring-emsp-yellow focus:border-emsp-yellow transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-emsp-lightGreen font-mono text-center text-lg text-base touch-manipulation"
               placeholder="ABCD-1234"
+              style={{ fontSize: '16px' }} // Évite le zoom automatique sur iOS
             />
           </motion.div>
 
@@ -133,8 +138,14 @@ export default function ControllerLogin({ onLoginSuccess }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 border-2 border-emsp-yellow/30 rounded-xl focus:ring-2 focus:ring-emsp-yellow focus:border-emsp-yellow transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-emsp-lightGreen"
+              inputMode="text"
+              autoComplete="current-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck="false"
+              className="w-full px-4 py-3 border-2 border-emsp-yellow/30 rounded-xl focus:ring-2 focus:ring-emsp-yellow focus:border-emsp-yellow transition-all duration-300 bg-white/80 backdrop-blur-sm hover:border-emsp-lightGreen touch-manipulation"
               placeholder="••••••••"
+              style={{ fontSize: '16px' }} // Évite le zoom automatique sur iOS
             />
           </motion.div>
 
