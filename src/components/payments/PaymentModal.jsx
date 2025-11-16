@@ -264,28 +264,29 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
   const moisOptions = [1, 2, 3, 5, 6, 12]
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full my-auto max-h-[95vh] flex flex-col">
         {/* En-tête */}
-        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-emsp-green">
+        <div className="border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between flex-shrink-0">
+          <div className="flex-1 min-w-0 pr-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-emsp-green truncate">
               Enregistrer un paiement
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-xs sm:text-sm text-gray-600 mt-1 truncate">
               {student.nom} {student.prenom || ''} - {student.classe}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
+            style={{ minWidth: '44px', minHeight: '44px' }}
           >
             <X size={24} />
           </button>
         </div>
 
         {/* Formulaire */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto flex-1">
           {/* Informations étudiant */}
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <div className="flex justify-between">
@@ -315,8 +316,8 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
 
           {/* Nombre de mois */}
           <div>
-            <label className="label">Nombre de mois *</label>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+            <label className="label text-sm sm:text-base">Nombre de mois *</label>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {moisOptions.map((mois) => (
                 <button
                   key={mois}
@@ -491,17 +492,23 @@ export default function PaymentModal({ student, onClose, onSuccess }) {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-200 flex-shrink-0">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={loading}
+              className="w-full sm:w-auto"
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Enregistrement...' : 'Enregistrer le paiement'}
+            <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+              {loading ? 'Enregistrement...' : (
+                <>
+                  <span className="hidden sm:inline">Enregistrer le paiement</span>
+                  <span className="sm:hidden">Enregistrer</span>
+                </>
+              )}
             </Button>
           </div>
         </form>

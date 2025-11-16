@@ -130,7 +130,7 @@ export default function StudentList() {
   return (
     <div className="space-y-6">
       {/* En-tête avec statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
         <Card className="bg-gradient-to-br from-emsp-green to-emsp-green-light text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -173,46 +173,48 @@ export default function StudentList() {
       </div>
 
       {/* Barre de recherche et actions */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="flex-1 flex gap-2" data-tour="student-search">
-          <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center justify-between">
+        <div className="flex-1 flex flex-col sm:flex-row gap-2" data-tour="student-search">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
               placeholder="Rechercher par nom, prénom ou contact..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emsp-yellow focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emsp-yellow focus:border-transparent text-base"
             />
           </div>
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center space-x-2"
+            className="flex items-center justify-center space-x-2 w-full sm:w-auto"
           >
             <Filter size={18} />
             <span>Filtres</span>
           </Button>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => setShowImportExport(true)}
-            className="flex items-center space-x-2"
+            className="flex items-center justify-center space-x-2 w-full sm:w-auto"
           >
             <Upload size={20} />
-            <span>Import/Export</span>
+            <span className="hidden sm:inline">Import/Export</span>
+            <span className="sm:hidden">Import</span>
           </Button>
           <Button
             onClick={() => {
               setEditingStudent(null)
               setShowForm(true)
             }}
-            className="flex items-center space-x-2"
+            className="flex items-center justify-center space-x-2 w-full sm:w-auto"
             data-tour="add-student-btn"
           >
             <Plus size={20} />
-            <span>Ajouter un étudiant</span>
+            <span className="hidden sm:inline">Ajouter un étudiant</span>
+            <span className="sm:hidden">Ajouter</span>
           </Button>
         </div>
       </div>
@@ -229,7 +231,7 @@ export default function StudentList() {
               <X size={20} />
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             {/* Filtre ligne */}
             <div>
               <label className="label">Ligne de car</label>

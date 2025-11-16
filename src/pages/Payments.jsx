@@ -147,24 +147,25 @@ export default function Payments() {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex justify-between items-center"
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0"
           >
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent">
                 Paiements
               </h1>
-              <p className="text-gray-600 mt-1">
+              <p className="text-sm sm:text-base text-gray-600 mt-1">
                 Gérez les paiements des étudiants
               </p>
             </div>
             <AnimatedButton 
               variant="primary" 
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 w-full sm:w-auto"
               onClick={() => setShowSelectStudent(true)}
               data-tour="add-payment-btn"
             >
               <Plus size={20} />
-              <span>Nouveau paiement</span>
+              <span className="hidden sm:inline">Nouveau paiement</span>
+              <span className="sm:hidden">Nouveau</span>
             </AnimatedButton>
           </motion.div>
 
@@ -210,12 +211,12 @@ export default function Payments() {
                     transition={{ delay: index * 0.05 }}
                     className="border-2 border-gray-200 rounded-xl p-4 hover:border-emsp-lightGreen hover:shadow-md transition-all duration-300"
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-emsp-green text-lg">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-emsp-green text-base sm:text-lg truncate">
                           {payment.students?.nom || ''} {payment.students?.prenom || ''}
                         </p>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-xs sm:text-sm text-gray-600 mt-1">
                           {formatDate(payment.created_at, 'd MMMM yyyy')}
                         </p>
                         {payment.nombre_mois && (
@@ -224,11 +225,11 @@ export default function Payments() {
                           </p>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold bg-gradient-to-r from-emsp-yellow to-emsp-green bg-clip-text text-transparent">
+                      <div className="w-full sm:w-auto text-left sm:text-right">
+                        <p className="text-lg sm:text-xl font-bold bg-gradient-to-r from-emsp-yellow to-emsp-green bg-clip-text text-transparent">
                           {Intl.NumberFormat('fr-FR').format(payment.montant_total || 0)} FCFA
                         </p>
-                        <div className="mt-2 flex items-center justify-end space-x-2">
+                        <div className="mt-2 flex items-center sm:justify-end space-x-2 flex-wrap gap-2">
                           <AnimatedBadge
                             variant="success"
                           >

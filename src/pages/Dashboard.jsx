@@ -336,24 +336,24 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent">
               Tableau de bord EMSP
             </h1>
-            <p className="text-gray-600 mt-1">
-              Bienvenue, {user?.email} ({role})
+            <p className="text-sm sm:text-base text-gray-600 mt-1 break-words">
+              Bienvenue, {user?.email?.split('@')[0] || user?.email} ({role})
             </p>
           </motion.div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6" data-tour="dashboard-stats">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-6" data-tour="dashboard-stats">
             {stats.map((stat, index) => {
               const Icon = stat.icon
               return (
-                <AnimatedCard key={index} delay={index * 0.1} className="p-6">
+                <AnimatedCard key={index} delay={index * 0.1} className="p-3 sm:p-4 md:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-2">{stat.title}</p>
-                      <p className="text-3xl font-bold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2 truncate">{stat.title}</p>
+                      <p className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent">
                         {stat.isCurrency ? (
                           <AnimatedCounter
                             value={stat.value}
@@ -372,11 +372,11 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <motion.div
-                      className={`${stat.bgColor} ${stat.color} p-4 rounded-xl`}
+                      className={`${stat.bgColor} ${stat.color} p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl flex-shrink-0 ml-2`}
                       whileHover={{ rotate: [0, -10, 10, -10, 0] }}
                       transition={{ duration: 0.5 }}
                     >
-                      <Icon size={28} />
+                      <Icon size={20} className="sm:w-6 sm:h-6 md:w-7 md:h-7" />
                     </motion.div>
                   </div>
                 </AnimatedCard>
@@ -385,11 +385,11 @@ export default function Dashboard() {
           </div>
 
           {/* Quick Actions */}
-          <AnimatedCard delay={0.4} className="p-6">
-            <h2 className="text-xl font-semibold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent mb-6">
+          <AnimatedCard delay={0.4} className="p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-emsp-yellow via-emsp-lightGreen to-emsp-green bg-clip-text text-transparent mb-4 sm:mb-6">
               Actions rapides
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-tour="quick-actions">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4" data-tour="quick-actions">
               {(role === 'admin' || role === 'educator') && (
                 <>
                   <AnimatedButton 
@@ -436,11 +436,12 @@ export default function Dashboard() {
           {(role === 'admin' || role === 'educator') && (
             <>
               {/* Évolution paiements (7 derniers jours) */}
-              <AnimatedCard delay={0.5} className="p-6">
-                <h2 className="text-xl font-semibold text-emsp-green mb-4">
+              <AnimatedCard delay={0.5} className="p-4 sm:p-6 overflow-hidden">
+                <h2 className="text-lg sm:text-xl font-semibold text-emsp-green mb-3 sm:mb-4">
                   Évolution des paiements (7 derniers jours)
                 </h2>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                  <ResponsiveContainer width="100%" height={250} className="min-w-[300px]">
                   <BarChart data={paymentsData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
@@ -455,15 +456,17 @@ export default function Dashboard() {
                     <Bar dataKey="montant" fill="#2D5016" name="Montant (k FCFA)" />
                     <Bar dataKey="count" fill="#FDB913" name="Nombre de paiements" />
                   </BarChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                </div>
               </AnimatedCard>
 
               {/* Répartition par ligne */}
-              <AnimatedCard delay={0.6} className="p-6">
-                <h2 className="text-xl font-semibold text-emsp-green mb-4">
+              <AnimatedCard delay={0.6} className="p-4 sm:p-6 overflow-hidden">
+                <h2 className="text-lg sm:text-xl font-semibold text-emsp-green mb-3 sm:mb-4">
                   Répartition par ligne
                 </h2>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                  <ResponsiveContainer width="100%" height={250} className="min-w-[300px]">
                   <PieChart>
                     <Pie
                       data={lineData}
@@ -483,15 +486,17 @@ export default function Dashboard() {
                     <Tooltip />
                     <Legend />
                   </PieChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                </div>
               </AnimatedCard>
 
               {/* Scans par heure (aujourd'hui) */}
-              <AnimatedCard delay={0.7} className="p-6">
-                <h2 className="text-xl font-semibold text-emsp-green mb-4">
+              <AnimatedCard delay={0.7} className="p-4 sm:p-6 overflow-hidden">
+                <h2 className="text-lg sm:text-xl font-semibold text-emsp-green mb-3 sm:mb-4">
                   Scans par heure (aujourd&apos;hui)
                 </h2>
-                <ResponsiveContainer width="100%" height={300}>
+                <div className="w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                  <ResponsiveContainer width="100%" height={250} className="min-w-[300px]">
                   <BarChart data={scansByHour}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="hour" />
@@ -501,23 +506,24 @@ export default function Dashboard() {
                     <Bar dataKey="approved" stackId="a" fill="#7CB342" name="Approuvés" />
                     <Bar dataKey="rejected" stackId="a" fill="#EF4444" name="Refusés" />
                   </BarChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                </div>
               </AnimatedCard>
             </>
           )}
 
           {/* Widget Rappels récents */}
           {(role === 'admin' || role === 'educator') && (
-            <AnimatedCard delay={0.5} className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-emsp-green flex items-center">
-                  <Bell size={24} className="mr-2" />
+            <AnimatedCard delay={0.5} className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-2 sm:gap-0">
+                <h2 className="text-lg sm:text-xl font-semibold text-emsp-green flex items-center">
+                  <Bell size={20} className="sm:w-6 sm:h-6 mr-2" />
                   Rappels récents
                 </h2>
                 <AnimatedButton
                   variant="outline"
                   onClick={() => navigate('/rappels')}
-                  className="text-sm"
+                  className="text-xs sm:text-sm w-full sm:w-auto"
                 >
                   Voir tout
                 </AnimatedButton>
@@ -536,12 +542,12 @@ export default function Dashboard() {
                       key={reminder.id}
                       className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-emsp-green transition-colors"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900 break-words">
                             {reminder.recipients_count} rappel(s) envoyé(s) à {reminder.recipients_count} étudiant(s)
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 mt-1 break-words">
                             {reminder.sent_by_profile?.nom || reminder.sent_by_profile?.email || 'Système'} •{' '}
                             {formatDistanceToNow(parseISO(reminder.sent_at), {
                               addSuffix: true,
@@ -549,7 +555,7 @@ export default function Dashboard() {
                             })}
                           </p>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        <span className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
                           reminder.reminder_type === 'automatic'
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-purple-100 text-purple-800'
