@@ -124,23 +124,27 @@ export default function ResetDatabaseModal({ isOpen, onClose }) {
         const { data: user, error: userError } = await supabase.auth.getUser()
         if (userError) {
           logger.debug('Impossible de récupérer l\'utilisateur pour le log', userError)
-        } else if (user?.user) {
-          await supabase.from('activity_logs').insert({
-            action_type: 'DATABASE_RESET',
-            entity_type: 'SYSTEM',
-            user_id: user.user.id,
-            details: {
-              deleted_counts: data || {},
-              backup_created: !!backupData,
-              timestamp: new Date().toISOString()
-            }
-          }).catch((logErr) => {
-            // Si la table n'existe pas ou erreur, continuer quand même
-            logger.debug('Impossible d\'enregistrer dans activity_logs', {
-              error: logErr?.message || logErr,
-              code: logErr?.code
+        } else if (user?.user?.id) {
+          // Vérifier que l'utilisateur a un ID valide (UUID)
+          const userId = user.user.id
+          if (userId && typeof userId === 'string' && userId.length > 0) {
+            await supabase.from('activity_logs').insert({
+              action_type: 'DATABASE_RESET',
+              entity_type: 'SYSTEM',
+              user_id: userId,
+              details: {
+                deleted_counts: data || {},
+                backup_created: !!backupData,
+                timestamp: new Date().toISOString()
+              }
+            }).catch((logErr) => {
+              // Si la table n'existe pas ou erreur, continuer quand même
+              logger.debug('Impossible d\'enregistrer dans activity_logs', {
+                error: logErr?.message || logErr,
+                code: logErr?.code
+              })
             })
-          })
+          }
         }
       } catch (logError) {
         // Erreur non bloquante pour le log

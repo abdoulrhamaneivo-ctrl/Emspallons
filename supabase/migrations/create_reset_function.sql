@@ -85,21 +85,18 @@ BEGIN
   );
   
   -- Reset les paramètres globaux (si la table settings existe)
-  -- Vérifier d'abord si l'enregistrement existe, sinon le créer
-  IF EXISTS (SELECT 1 FROM settings WHERE id = 'global') THEN
+  -- Mettre à jour le premier enregistrement ou en créer un nouveau
+  IF EXISTS (SELECT 1 FROM settings LIMIT 1) THEN
+    -- Mettre à jour le premier enregistrement trouvé
     UPDATE settings SET
       paused_months = '[]'::jsonb,
       default_monthly_fee = 12500,
       updated_at = NOW()
-    WHERE id = 'global';
+    WHERE id = (SELECT id FROM settings LIMIT 1);
   ELSE
-    -- Si aucun enregistrement n'existe, en créer un par défaut
-    INSERT INTO settings (id, paused_months, default_monthly_fee, created_at, updated_at)
-    VALUES ('global', '[]'::jsonb, 12500, NOW(), NOW())
-    ON CONFLICT (id) DO UPDATE SET
-      paused_months = '[]'::jsonb,
-      default_monthly_fee = 12500,
-      updated_at = NOW();
+    -- Si aucun enregistrement n'existe, en créer un par défaut avec UUID auto-généré
+    INSERT INTO settings (paused_months, default_monthly_fee, created_at, updated_at)
+    VALUES ('[]'::jsonb, 12500, NOW(), NOW());
   END IF;
   
   -- Construire le résumé (après suppression)
