@@ -6,7 +6,25 @@ L'erreur `FunctionsHttpError: Edge Function returned a non-2xx status code` indi
 
 ## ✅ Solution : Déployer les Edge Functions
 
-### Prérequis
+### 🚀 Déploiement Rapide (Script Automatique)
+
+**Option la plus simple** : Utiliser le script interactif
+
+```bash
+# Rendre le script exécutable
+chmod +x deploy-edge-functions-interactive.sh
+
+# Exécuter le script
+./deploy-edge-functions-interactive.sh
+```
+
+Le script vous guidera à travers toutes les étapes automatiquement.
+
+---
+
+### 📋 Déploiement Manuel (Étape par Étape)
+
+#### Prérequis
 
 1. **Supabase CLI installé** :
    ```bash
