@@ -135,10 +135,11 @@ Le système de scan QR permet aux contrôleurs de vérifier l'accès des étudia
 
 ### Réinitialisation des Scans (Reset)
 - **Bouton** : Icône `RefreshCcw` dans l'en-tête
-- **Action** : Supprime tous les scans de la **dernière heure** pour le contrôleur actif
+- **Action** : Supprime **tous les scans d'aujourd'hui** (depuis 00:00:00) pour le contrôleur actif
 - **Utilité** : Permet de rescanner les étudiants sans message de doublon
-- **Confirmation** : Oui (dialogue de confirmation)
-- **Portée** : Uniquement les scans du contrôleur connecté
+- **Confirmation** : Oui (dialogue de confirmation avec nombre de scans à supprimer)
+- **Portée** : Uniquement les scans du contrôleur connecté effectués aujourd'hui
+- **Affichage** : Affiche le nombre de scans qui seront supprimés dans la confirmation
 
 ---
 

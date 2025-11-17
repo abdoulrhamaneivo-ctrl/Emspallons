@@ -509,7 +509,7 @@ export default function ControllerScanner() {
     setScanning(false)
   }, [])
 
-  // Fonction de réinitialisation des scans - Supprime les scans de la dernière heure
+  // Fonction de réinitialisation des scans - Supprime les scans d'aujourd'hui
   // Permet de rescanner les étudiants sans avoir de doublons
   // Utile quand un contrôleur et un étudiant discutent et veulent reprendre le scan
   const resetTodayScans = async () => {
@@ -518,31 +518,42 @@ export default function ControllerScanner() {
       return
     }
 
-    if (!confirm('Réinitialiser les scans de la dernière heure ?\n\nLes scans effectués dans la dernière heure seront supprimés, permettant de rescanner les étudiants sans doublons.')) {
+    // Calculer le début de la journée (00:00:00 aujourd'hui)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStart = today.toISOString()
+
+    // Compter les scans d'aujourd'hui pour afficher dans la confirmation
+    const { count: scansCount } = await supabase
+      .from('scan_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('controller_id', controller.id)
+      .gte('scanned_at', todayStart)
+
+    if (!confirm(`Réinitialiser les scans d'aujourd'hui ?\n\n${scansCount || 0} scan(s) effectué(s) aujourd'hui seront supprimés, permettant de rescanner les étudiants sans doublons.`)) {
       return
     }
 
     try {
-      // Supprimer les scans de la dernière heure pour ce contrôleur
+      // Supprimer tous les scans d'aujourd'hui (depuis 00:00:00) pour ce contrôleur
       // Cela permet de rescanner les étudiants sans avoir de message de doublon
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-
       const { error } = await supabase
         .from('scan_logs')
         .delete()
         .eq('controller_id', controller.id)
-        .gte('scanned_at', oneHourAgo)
+        .gte('scanned_at', todayStart)
 
       if (error) {
         logger.error('Erreur réinitialisation scans', error)
         throw error
       }
 
-      toast.success('Scans de la dernière heure réinitialisés. Vous pouvez maintenant rescanner les étudiants.')
+      toast.success(`Scans d'aujourd'hui réinitialisés (${scansCount || 0} scan(s) supprimé(s)). Vous pouvez maintenant rescanner les étudiants.`)
       
-      logger.info('Réinitialisation scans contrôleur (dernière heure)', {
+      logger.info('Réinitialisation scans contrôleur (aujourd\'hui)', {
         controller_id: controller.id,
-        one_hour_ago: oneHourAgo,
+        today_start: todayStart,
+        scans_deleted: scansCount || 0,
         timestamp: new Date().toISOString()
       })
 
