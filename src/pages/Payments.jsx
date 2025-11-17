@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
@@ -29,36 +29,8 @@ export default function Payments() {
   const [selectedPayment, setSelectedPayment] = useState(null)
   const [selectedPaymentStudent, setSelectedPaymentStudent] = useState(null)
 
-  useEffect(() => {
-    fetchPayments()
-  }, [])
-
-  // Gérer l'ouverture du modal depuis le dashboard
-  useEffect(() => {
-    // Vérifier si on vient du dashboard avec openPayment ou sessionStorage
-    const shouldOpen = location.state?.openPayment || sessionStorage.getItem('openPaymentForm')
-    
-    if (shouldOpen) {
-      // Nettoyer sessionStorage
-      sessionStorage.removeItem('openPaymentForm')
-      // Attendre un peu pour que la page soit chargée
-      setTimeout(() => {
-        setShowSelectStudent(true)
-      }, 300)
-    }
-
-    // Écouter l'événement custom
-    const handleOpenPayment = () => {
-      setShowSelectStudent(true)
-    }
-    window.addEventListener('open-payment-form', handleOpenPayment)
-
-    return () => {
-      window.removeEventListener('open-payment-form', handleOpenPayment)
-    }
-  }, [location.state])
-
-  const fetchPayments = async () => {
+  // Déplacer fetchPayments avant useEffect pour éviter l'erreur TDZ
+  const fetchPayments = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('payments')
@@ -89,7 +61,36 @@ export default function Payments() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchPayments()
+  }, [fetchPayments])
+
+  // Gérer l'ouverture du modal depuis le dashboard
+  useEffect(() => {
+    // Vérifier si on vient du dashboard avec openPayment ou sessionStorage
+    const shouldOpen = location.state?.openPayment || sessionStorage.getItem('openPaymentForm')
+    
+    if (shouldOpen) {
+      // Nettoyer sessionStorage
+      sessionStorage.removeItem('openPaymentForm')
+      // Attendre un peu pour que la page soit chargée
+      setTimeout(() => {
+        setShowSelectStudent(true)
+      }, 300)
+    }
+
+    // Écouter l'événement custom
+    const handleOpenPayment = () => {
+      setShowSelectStudent(true)
+    }
+    window.addEventListener('open-payment-form', handleOpenPayment)
+
+    return () => {
+      window.removeEventListener('open-payment-form', handleOpenPayment)
+    }
+  }, [location.state])
 
   const receiptCacheRef = useRef(new Map())
 
