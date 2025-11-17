@@ -181,6 +181,8 @@ export default function ControllerScanner() {
       // 2. VÉRIFICATION DOUBLONS (PRIORITÉ)
       // Vérifier si ce même étudiant a été scanné par ce contrôleur dans la dernière heure
       // IMPORTANT : Chercher le PREMIER scan (plus ancien) pour afficher l'heure du premier scan
+      // NOTE : On inclut TOUS les statuts (approved, wrong_line, expired) pour éviter les doublons
+      // même si le premier scan était refusé (ex: ligne incorrecte)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
       const { data: recentScans, error: recentScansError } = await supabase
         .from('scan_logs')
