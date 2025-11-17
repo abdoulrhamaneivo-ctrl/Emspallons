@@ -5,6 +5,7 @@ import AnimatedButton from '../ui/AnimatedButton'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import logger from '../../lib/logger'
+import { logActivity, ACTIONS } from '../../lib/activityLogger'
 
 export default function PromoteAdminModal({ isOpen, onClose, user, onSuccess }) {
   const [promoting, setPromoting] = useState(false)
@@ -21,28 +22,21 @@ export default function PromoteAdminModal({ isOpen, onClose, user, onSuccess }) 
 
       if (updateError) throw updateError
 
-      // Logger dans activity_logs
+      // Traçabilité - Log de la promotion
       try {
-        const { data: currentUser } = await supabase.auth.getUser()
-        if (currentUser?.user?.id) {
-          await supabase.from('activity_logs').insert([
-            {
-              action: 'ADMIN_PROMOTE',
-              entity_type: 'USER',
-              user_id: currentUser.user.id,
-              details: {
-                promoted_user_id: user.id,
-                promoted_user_email: user.email,
-                promoted_user_nom: user.nom,
-                timestamp: new Date().toISOString()
-              },
-            },
-          ]).catch((logErr) => {
-            logger.debug('Impossible d\'enregistrer dans activity_logs', logErr)
-          })
-        }
+        await logActivity({
+          action: ACTIONS.PROMOTE_TO_ADMIN,
+          entityType: 'user',
+          entityId: user.id,
+          details: {
+            promoted_user_email: user.email,
+            promoted_user_nom: user.nom,
+            old_role: user.role,
+            new_role: 'admin',
+          },
+        })
       } catch (logError) {
-        logger.debug('Erreur lors de l\'enregistrement du log', logError)
+        logger.error('Erreur lors du logging d\'activité', logError)
       }
 
       toast.success(`${user.nom} a été promu administrateur avec succès`)

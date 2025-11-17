@@ -13,6 +13,7 @@ import { ROLES } from '../lib/constants'
 import PromoteAdminModal from '../components/admin/PromoteAdminModal'
 import ResetPasswordModal from '../components/admin/ResetPasswordModal'
 import logger from '../lib/logger'
+import { logActivity, ACTIONS } from '../lib/activityLogger'
 
 export default function AdminUsers() {
   const { isAdmin, role } = useAuth()
@@ -93,8 +94,29 @@ export default function AdminUsers() {
         body: { userId, email }
       })
 
-      if (error) throw error
+      if (error) {
+        if (error.message?.includes('Function not found') || error.message?.includes('404')) {
+          throw new Error(
+            'Edge Function resend-confirmation-email non déployée.\n\n' +
+            'Veuillez déployer les Edge Functions depuis le dossier supabase/functions.'
+          )
+        }
+        throw error
+      }
+
       if (data?.error) throw new Error(data.error)
+
+      // Traçabilité
+      try {
+        await logActivity({
+          action: 'resend_confirmation_email',
+          entityType: 'user',
+          entityId: userId,
+          details: { email },
+        })
+      } catch (logError) {
+        logger.error('Erreur lors du logging d\'activité', logError)
+      }
 
       toast.success('Email de confirmation renvoyé avec succès')
       logger.info('Email de confirmation renvoyé', { userId, email })
@@ -140,7 +162,6 @@ export default function AdminUsers() {
 
     try {
       setSaving(true)
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
       const functionName = editingUser ? 'update-user' : 'create-user'
 
       const payload = {
@@ -151,12 +172,104 @@ export default function AdminUsers() {
         ...(editingUser && { userId: editingUser.id }),
       }
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: payload,
-      })
+      let result
+      let userCreated = null
 
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
+      try {
+        // Essayer d'abord avec l'Edge Function
+        const { data, error } = await supabase.functions.invoke(functionName, {
+          body: payload,
+        })
+
+        if (error) {
+          // Si l'Edge Function n'est pas disponible, donner un message clair
+          if (error.message?.includes('Function not found') || error.message?.includes('404')) {
+            throw new Error(
+              'Les fonctions Supabase ne sont pas déployées. ' +
+              'Veuillez déployer les Edge Functions depuis le dossier supabase/functions. ' +
+              'Voir DEPLOIEMENT_EDGE_FUNCTIONS.md pour les instructions.'
+            )
+          }
+          throw error
+        }
+
+        if (data?.error) {
+          throw new Error(data.error)
+        }
+
+        result = data
+        userCreated = data?.user || null
+      } catch (functionError) {
+        // Si l'Edge Function échoue, essayer une méthode alternative
+        logger.warn('Edge Function échouée, tentative méthode alternative', functionError)
+        
+        if (editingUser) {
+          // Pour la mise à jour, on peut utiliser directement Supabase
+          const { data: updateData, error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              nom: formData.nom.trim(),
+              role: formData.role,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', editingUser.id)
+            .select()
+            .single()
+
+          if (updateError) throw updateError
+
+          // Si un nouveau mot de passe est fourni, on ne peut pas le changer sans Edge Function
+          if (formData.password) {
+            toast.warning('Le mot de passe ne peut pas être modifié sans Edge Function déployée. Utilisez "Réinitialiser le mot de passe" à la place.')
+          }
+
+          result = { success: true, user: updateData }
+          userCreated = updateData
+        } else {
+          // Pour la création, on ne peut pas créer d'utilisateur sans Edge Function
+          // car on a besoin du service role key
+          throw new Error(
+            'Impossible de créer un utilisateur : les Edge Functions Supabase ne sont pas déployées.\n\n' +
+            '📋 Actions requises :\n' +
+            '1. Déployer les Edge Functions depuis le dossier supabase/functions\n' +
+            '2. Voir DEPLOIEMENT_EDGE_FUNCTIONS.md pour les instructions détaillées\n\n' +
+            'Erreur technique : ' + (functionError.message || 'Edge Function non disponible')
+          )
+        }
+      }
+
+      // Traçabilité - Log de l'activité
+      try {
+        if (editingUser) {
+          await logActivity({
+            action: ACTIONS.UPDATE_USER,
+            entityType: 'user',
+            entityId: editingUser.id,
+            details: {
+              old_email: editingUser.email,
+              new_email: formData.email.trim(),
+              old_role: editingUser.role,
+              new_role: formData.role,
+              old_nom: editingUser.nom,
+              new_nom: formData.nom.trim(),
+            },
+          })
+        } else {
+          await logActivity({
+            action: ACTIONS.CREATE_USER,
+            entityType: 'user',
+            entityId: userCreated?.id || null,
+            details: {
+              email: formData.email.trim(),
+              nom: formData.nom.trim(),
+              role: formData.role,
+            },
+          })
+        }
+      } catch (logError) {
+        // Ne pas bloquer si le logging échoue
+        logger.error('Erreur lors du logging d\'activité', logError)
+      }
 
       if (editingUser) {
         toast.success('Éducateur mis à jour avec succès')
@@ -169,37 +282,78 @@ export default function AdminUsers() {
       setErrors({})
       fetchUsers()
     } catch (error) {
-      toast.error(error.message || 'Erreur lors de l\'enregistrement')
-      console.error(error)
+      logger.error('Erreur lors de l\'enregistrement de l\'utilisateur', error)
+      const errorMessage = error.message || 'Erreur lors de l\'enregistrement'
+      toast.error(errorMessage)
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
+    const userToDelete = users.find(u => u.id === id)
+    if (!userToDelete) {
+      toast.error('Utilisateur introuvable')
+      return
+    }
+
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${userToDelete.nom}" (${userToDelete.email}) ?\n\nCette action est irréversible.`)) {
       return
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { userId: id },
-      })
+      let deleted = false
 
-      if (error) {
-        console.error('Error invoking delete-user:', error)
-        throw new Error(error.message || 'Erreur lors de l\'appel de la fonction')
+      try {
+        // Essayer d'abord avec l'Edge Function
+        const { data, error } = await supabase.functions.invoke('delete-user', {
+          body: { userId: id },
+        })
+
+        if (error) {
+          if (error.message?.includes('Function not found') || error.message?.includes('404')) {
+            throw new Error('Edge Function delete-user non déployée')
+          }
+          throw error
+        }
+
+        if (data?.error) {
+          throw new Error(data.error)
+        }
+
+        deleted = true
+      } catch (functionError) {
+        // Si l'Edge Function n'est pas disponible, on ne peut pas supprimer
+        // car on a besoin du service role key pour supprimer un utilisateur auth
+        logger.error('Impossible de supprimer sans Edge Function', functionError)
+        throw new Error(
+          'Impossible de supprimer l\'utilisateur : les Edge Functions Supabase ne sont pas déployées.\n\n' +
+          '📋 Actions requises :\n' +
+          '1. Déployer les Edge Functions depuis le dossier supabase/functions\n' +
+          '2. Voir DEPLOIEMENT_EDGE_FUNCTIONS.md pour les instructions détaillées'
+        )
       }
 
-      if (data?.error) {
-        console.error('Error from delete-user function:', data.error)
-        throw new Error(data.error)
+      // Traçabilité - Log de la suppression
+      try {
+        await logActivity({
+          action: ACTIONS.DELETE_USER,
+          entityType: 'user',
+          entityId: id,
+          details: {
+            deleted_email: userToDelete.email,
+            deleted_nom: userToDelete.nom,
+            deleted_role: userToDelete.role,
+          },
+        })
+      } catch (logError) {
+        logger.error('Erreur lors du logging d\'activité', logError)
       }
 
       toast.success('Utilisateur supprimé avec succès')
       fetchUsers()
     } catch (error) {
-      console.error('Delete error:', error)
+      logger.error('Erreur lors de la suppression de l\'utilisateur', error)
       const errorMessage = error.message || error.error || 'Erreur lors de la suppression'
       toast.error(errorMessage)
     }

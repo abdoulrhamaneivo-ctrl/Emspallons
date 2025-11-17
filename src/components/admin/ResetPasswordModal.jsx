@@ -5,6 +5,7 @@ import AnimatedButton from '../ui/AnimatedButton'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import logger from '../../lib/logger'
+import { logActivity, ACTIONS } from '../../lib/activityLogger'
 
 // Génère un mot de passe sécurisé
 const generateSecurePassword = () => {
@@ -89,29 +90,20 @@ export default function ResetPasswordModal({ isOpen, onClose, user, onSuccess })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
 
-      // Logger dans activity_logs
+      // Traçabilité - Log de la réinitialisation
       try {
-        const { data: currentUser } = await supabase.auth.getUser()
-        if (currentUser?.user?.id) {
-          await supabase.from('activity_logs').insert([
-            {
-              action: 'PASSWORD_RESET',
-              entity_type: 'USER',
-              user_id: currentUser.user.id,
-              details: {
-                reset_user_id: user.id,
-                reset_user_email: user.email,
-                reset_user_nom: user.nom,
-                send_email: sendEmail,
-                timestamp: new Date().toISOString()
-              },
-            },
-          ]).catch((logErr) => {
-            logger.debug('Impossible d\'enregistrer dans activity_logs', logErr)
-          })
-        }
+        await logActivity({
+          action: ACTIONS.RESET_USER_PASSWORD,
+          entityType: 'user',
+          entityId: user.id,
+          details: {
+            reset_user_email: user.email,
+            reset_user_nom: user.nom,
+            send_email: sendEmail,
+          },
+        })
       } catch (logError) {
-        logger.debug('Erreur lors de l\'enregistrement du log', logError)
+        logger.error('Erreur lors du logging d\'activité', logError)
       }
 
       // Copier automatiquement le mot de passe
