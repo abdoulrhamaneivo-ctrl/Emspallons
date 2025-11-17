@@ -271,11 +271,27 @@ export default function AdminUsers() {
         logger.error('Erreur lors du logging d\'activité', logError)
       }
 
-      if (editingUser) {
-        toast.success('Éducateur mis à jour avec succès')
-      } else {
-        toast.success('Éducateur créé avec succès. Un email de confirmation a été envoyé.')
-      }
+        if (editingUser) {
+          toast.success('Éducateur mis à jour avec succès')
+        } else {
+          // Vérifier si l'email a été envoyé
+          if (result?.warning || result?.email_error) {
+            toast.error(
+              `Éducateur créé, mais l'email n'a pas pu être envoyé. ${result.warning || 'Configuration SMTP requise.'}`,
+              { duration: 6000 }
+            )
+            if (result.confirmation_link) {
+              console.log('🔗 Lien de confirmation:', result.confirmation_link)
+              logger.warn('Email non envoyé - Lien de confirmation disponible', {
+                userId: userCreated?.id,
+                email: formData.email.trim(),
+                confirmationLink: result.confirmation_link
+              })
+            }
+          } else {
+            toast.success('Éducateur créé avec succès. Un email de confirmation a été envoyé.')
+          }
+        }
       setShowForm(false)
       setEditingUser(null)
       setFormData({ email: '', nom: '', password: '', role: ROLES.EDUCATOR })
