@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
@@ -94,7 +94,8 @@ export default function Payments() {
 
   const receiptCacheRef = useRef(new Map())
 
-  const getReceiptFromCache = async (payment, student) => {
+  // Déplacer toutes les fonctions avant leur utilisation pour éviter les erreurs TDZ
+  const getReceiptFromCache = useCallback(async (payment, student) => {
     const key = `${payment.id}-${student.id}`
     if (receiptCacheRef.current.has(key)) {
       return receiptCacheRef.current.get(key)
@@ -102,9 +103,9 @@ export default function Payments() {
     const doc = await generateReceiptPDF(payment, student)
     receiptCacheRef.current.set(key, doc)
     return doc
-  }
+  }, [])
 
-  const handleDownloadReceipt = async (payment) => {
+  const handleDownloadReceipt = useCallback(async (payment) => {
     try {
       const student = payment.students
       if (!student) {
@@ -120,9 +121,9 @@ export default function Payments() {
       logger.error('Erreur lors du téléchargement du reçu', error)
       toast.error('Erreur lors de la génération du reçu')
     }
-  }
+  }, [getReceiptFromCache])
 
-  const handlePreviewReceipt = async (payment) => {
+  const handlePreviewReceipt = useCallback(async (payment) => {
     try {
       const student = payment.students
       if (!student) {
@@ -137,9 +138,12 @@ export default function Payments() {
       logger.error('Erreur lors de l\'ouverture de la prévisualisation', error)
       toast.error('Erreur lors de l\'ouverture de la prévisualisation')
     }
-  }
+  }, [])
 
-  const totalAmount = payments.reduce((sum, payment) => sum + (payment.montant_total || 0), 0)
+  // Calculer totalAmount avec useMemo pour éviter les recalculs et problèmes TDZ
+  const totalAmount = useMemo(() => {
+    return payments.reduce((sum, payment) => sum + (payment.montant_total || 0), 0)
+  }, [payments])
 
   return (
     <Layout>
