@@ -5,6 +5,12 @@ import { supabase } from './supabase'
  * Exporte les étudiants en JSON
  */
 export const exportStudentsToJSON = (students) => {
+  // Vérifier que students est un tableau
+  if (!Array.isArray(students)) {
+    console.error('exportStudentsToJSON: students is not an array', students)
+    return
+  }
+  
   const dataStr = JSON.stringify(students, null, 2)
   const dataBlob = new Blob([dataStr], { type: 'application/json' })
   const url = URL.createObjectURL(dataBlob)
@@ -19,6 +25,12 @@ export const exportStudentsToJSON = (students) => {
  * Exporte les étudiants en CSV
  */
 export const exportStudentsToCSV = (students) => {
+  // Vérifier que students est un tableau
+  if (!Array.isArray(students)) {
+    console.error('exportStudentsToCSV: students is not an array', students)
+    return
+  }
+  
   const headers = ['Nom', 'Prénom', 'Contact', 'Tuteur', 'Ligne', 'Point de ramassage', 'Niveau', 'Classe', 'Statut paiement']
   const rows = students.map(student => [
     student.nom || '',
@@ -50,6 +62,12 @@ export const exportStudentsToCSV = (students) => {
  * Exporte les étudiants en Excel
  */
 export const exportStudentsToExcel = (students) => {
+  // Vérifier que students est un tableau
+  if (!Array.isArray(students)) {
+    console.error('exportStudentsToExcel: students is not an array', students)
+    return
+  }
+  
   const worksheet = XLSX.utils.json_to_sheet(
     students.map(student => ({
       'Nom': student.nom || '',
@@ -144,6 +162,15 @@ export const parseExcelFile = async (file) => {
  * Mappe les données importées vers le format étudiants
  */
 export const mapImportedDataToStudents = (data, lines) => {
+  // Vérifier que data est un tableau
+  if (!Array.isArray(data)) {
+    console.error('mapImportedDataToStudents: data is not an array', data)
+    return []
+  }
+  
+  // Vérifier que lines est un tableau
+  const linesArray = Array.isArray(lines) ? lines : []
+  
   return data.map((row) => {
     // Mapping flexible des colonnes
     const nom = row.Nom || row.nom || row['Nom'] || ''
@@ -157,7 +184,7 @@ export const mapImportedDataToStudents = (data, lines) => {
     const qrToken = row['QR Token'] || row.qr_code_token || row.qrToken || ''
     
     // Trouver la ligne par nom
-    const ligne = lines.find(l => l.nom === ligneNom)
+    const ligne = linesArray.find(l => l.nom === ligneNom)
     
     return {
       nom,

@@ -14,6 +14,12 @@ export default function ImportExportModal({ isOpen, onClose, students, lines, on
 
   const handleExport = (format) => {
     try {
+      // Vérifier que students est un tableau
+      if (!Array.isArray(students) || students.length === 0) {
+        toast.error('Aucun étudiant à exporter')
+        return
+      }
+      
       switch (format) {
         case 'json':
           exportStudentsToJSON(students)
@@ -58,7 +64,21 @@ export default function ImportExportModal({ isOpen, onClose, students, lines, on
             break
         }
 
-        const studentsToImport = mapImportedDataToStudents(data, lines)
+        // Vérifier que data est valide
+        if (!data || (Array.isArray(data) && data.length === 0)) {
+          toast.error('Le fichier est vide ou invalide')
+          setImporting(false)
+          return
+        }
+        
+        const studentsToImport = mapImportedDataToStudents(data, lines || [])
+        
+        if (!Array.isArray(studentsToImport) || studentsToImport.length === 0) {
+          toast.error('Aucun étudiant valide trouvé dans le fichier')
+          setImporting(false)
+          return
+        }
+        
         const missingLine = studentsToImport.filter(student => !student.ligne_id)
         if (missingLine.length > 0) {
           toast.error('Certaines lignes n\'ont pas de ligne de car correspondante. Vérifiez le mapping avant de continuer.')
