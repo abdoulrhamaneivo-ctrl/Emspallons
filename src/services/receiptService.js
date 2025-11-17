@@ -223,85 +223,85 @@ export const generateReceiptPDF = async (payment, student) => {
     // HEADER - Design moderne avec bande colorée
     // ============================================
     
-    // Bande de couleur en haut (gradient simulé)
+    // Bande verte en haut (header principal)
     doc.setFillColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.rect(0, 0, pageWidth, 25, 'F')
+    doc.rect(0, 0, pageWidth, 30, 'F')
     
-    // Deuxième bande (jaune)
-    doc.setFillColor(yRgb.r, yRgb.g, yRgb.b)
-    doc.rect(0, 25, pageWidth, 8, 'F')
-    
-    // Logo ou placeholder
-    yPosition = 35
+    // Logo (si disponible) - Positionné AVANT le titre pour éviter superposition
     try {
       const logoUrl = '/images/logo-ecole.png'
       const logoImg = await loadImage(logoUrl)
       
-      const logoMaxHeight = 25
+      const logoMaxHeight = 20
       const logoAspectRatio = logoImg.width / logoImg.height
       const logoHeight = logoMaxHeight
       const logoWidth = logoHeight * logoAspectRatio
-      const logoX = (pageWidth - logoWidth) / 2
+      const logoX = margin + 5
+      const logoY = 5
       
-      doc.addImage(logoImg, 'PNG', logoX, 5, logoWidth, logoHeight)
+      doc.addImage(logoImg, 'PNG', logoX, logoY, logoWidth, logoHeight)
     } catch (error) {
-      // Logo stylisé si non trouvé
+      // Logo stylisé si non trouvé - positionné à gauche
       doc.setFillColor(yRgb.r, yRgb.g, yRgb.b)
-      doc.circle(pageWidth / 2, 17, 8, 'F')
-      doc.setFillColor(gRgb.r, gRgb.g, gRgb.b)
-      doc.circle(pageWidth / 2, 17, 6, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(14)
+      doc.circle(margin + 15, 15, 6, 'F')
+      doc.setFillColor(255, 255, 255)
+      doc.circle(margin + 15, 15, 4, 'F')
+      doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
+      doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
-      doc.text('EMSP', pageWidth / 2, 19, { align: 'center' })
+      doc.text('EMSP', margin + 15, 17, { align: 'center' })
     }
   
-    // Titre principal (dans la bande verte)
-    doc.setFontSize(24)
+    // Titre principal (dans la bande verte) - Centré et bien espacé
+    doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(255, 255, 255)
     doc.text('REÇU DE PAIEMENT', pageWidth / 2, 18, { align: 'center' })
+    
+    // Deuxième bande (jaune) - Séparée du header
+    doc.setFillColor(yRgb.r, yRgb.g, yRgb.b)
+    doc.rect(0, 30, pageWidth, 5, 'F')
   
-    yPosition = 50
+    yPosition = 45 // Espacement après le header
   
-    // Numéro de reçu dans un encadré
+    // Numéro de reçu dans un encadré - Espacement amélioré
     const receiptNumber = generateReceiptNumber(payment.id)
     const emissionDate = formatDateFrench(new Date().toISOString())
     
-    // Fond gris clair pour le numéro de reçu
+    // Fond gris clair pour le numéro de reçu - Hauteur augmentée
     doc.setFillColor(glRgb.r, glRgb.g, glRgb.b)
     doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
     doc.setLineWidth(0.5)
-    doc.roundedRect(margin, yPosition, contentWidth, 15, 3, 3, 'FD')
+    doc.roundedRect(margin, yPosition, contentWidth, 12, 3, 3, 'FD')
     
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.text(`N° ${receiptNumber}`, margin + 5, yPosition + 8)
+    doc.text(`N° ${receiptNumber}`, margin + 5, yPosition + 7)
     
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
-    doc.text(`Émis le ${emissionDate}`, pageWidth - margin - 5, yPosition + 8, { align: 'right' })
+    doc.text(`Émis le ${emissionDate}`, pageWidth - margin - 5, yPosition + 7, { align: 'right' })
   
-    yPosition += 22
+    yPosition += 18 // Espacement après le numéro de reçu
   
     // ============================================
     // INFORMATIONS ÉTUDIANT - Carte moderne
     // ============================================
     
-    // Titre de section
-    doc.setFontSize(12)
+    // Titre de section - Espacement amélioré
+    doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.text('INFORMATIONS ÉTUDIANT', margin, yPosition)
     
-    yPosition += 8
+    yPosition += 7 // Espacement avant la carte
   
-    // Carte avec fond coloré léger
+    // Carte avec fond coloré léger - Hauteur ajustée
     doc.setFillColor(lgRgb.r, lgRgb.g, lgRgb.b)
     doc.setGState(doc.GState({ opacity: 0.1 }))
-    doc.roundedRect(margin, yPosition, contentWidth, 35, 5, 5, 'F')
+    doc.roundedRect(margin, yPosition, contentWidth, 32, 5, 5, 'F')
     doc.setGState(doc.GState({ opacity: 1 }))
   
     const studentData = [
@@ -311,22 +311,22 @@ export const generateReceiptPDF = async (payment, student) => {
       ['Ligne de car', student.lines?.nom || 'N/A'],
     ]
   
-    // Utiliser setTextColor avant autoTable (autoTable héritera de la couleur)
+    // Utiliser setTextColor avant autoTable
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     autoTable(doc, {
-      startY: yPosition + 3,
+      startY: yPosition + 2,
       head: false,
       body: studentData,
       theme: 'plain',
       styles: {
-        fontSize: 10,
-        cellPadding: 5,
+        fontSize: 9,
+        cellPadding: 4,
         lineColor: [0, 0, 0, 0], // Pas de bordures visibles
       },
       columnStyles: {
         0: { 
           fontStyle: 'bold', 
-          cellWidth: 50,
+          cellWidth: 45,
           font: 'helvetica',
         },
         1: { 
@@ -337,39 +337,40 @@ export const generateReceiptPDF = async (payment, student) => {
       tableLineColor: [0, 0, 0, 0],
       tableLineWidth: 0,
     })
+    
     // Redessiner la colonne 0 (labels) en vert après autoTable
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    const tableStartY = yPosition + 3
+    doc.setFontSize(9)
+    const tableStartY = yPosition + 2
     studentData.forEach((row, index) => {
-      const rowY = tableStartY + (index * 10) + 8
+      const rowY = tableStartY + (index * 7) + 6 // Espacement entre lignes augmenté
       doc.text(row[0] || '', margin + 3, rowY)
     })
     // Remettre la couleur normale pour la suite
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     doc.setFont('helvetica', 'normal')
   
-    yPosition = doc.lastAutoTable.finalY + 15
+    yPosition = doc.lastAutoTable.finalY + 12 // Espacement après la section
   
     // ============================================
     // DÉTAILS PAIEMENT - Tableau moderne
     // ============================================
     
-    doc.setFontSize(12)
+    doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.text('DÉTAILS DU PAIEMENT', margin, yPosition)
     
-    yPosition += 8
+    yPosition += 7 // Espacement avant le tableau
   
     const paymentData = [
       ['Description', 'Quantité', 'Montant unitaire', 'Montant total'],
       [
         'Abonnement transport scolaire',
         `${payment.nombre_mois} mois`,
-        formatCurrency(payment.montant_total / payment.nombre_mois),
-        formatCurrency(payment.montant_total)
+        formatCurrency(payment.montant_total / payment.nombre_mois).replace(' FCFA', ' F'),
+        formatCurrency(payment.montant_total).replace(' FCFA', ' F')
       ]
     ]
   
@@ -383,18 +384,18 @@ export const generateReceiptPDF = async (payment, student) => {
       theme: 'striped',
       headStyles: {
         fontStyle: 'bold',
-        fontSize: 10,
-        cellPadding: 6,
+        fontSize: 9,
+        cellPadding: 5,
       },
       bodyStyles: {
-        fontSize: 10,
-        cellPadding: 6,
+        fontSize: 9,
+        cellPadding: 5,
       },
       columnStyles: {
-        0: { cellWidth: 70, fontStyle: 'bold' },
-        1: { cellWidth: 35, halign: 'center' },
-        2: { cellWidth: 40, halign: 'right' },
-        3: { cellWidth: 40, halign: 'right', fontStyle: 'bold' },
+        0: { cellWidth: 65, fontStyle: 'bold' },
+        1: { cellWidth: 30, halign: 'center' },
+        2: { cellWidth: 35, halign: 'right' },
+        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold' },
       },
       margin: { left: margin, right: margin },
     })
@@ -403,25 +404,27 @@ export const generateReceiptPDF = async (payment, student) => {
     // Redessiner la colonne 3 (montant total) en vert
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
     doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
     const paymentTableY = yPosition
-    const bodyRowY = paymentTableY + 10 + 6 // Hauteur header + padding
-    doc.text(paymentData[1][3] || '', pageWidth - margin - 40, bodyRowY, { align: 'right' })
+    const bodyRowY = paymentTableY + 8 + 5 // Hauteur header + padding ajustés
+    doc.text(paymentData[1][3] || '', pageWidth - margin - 35, bodyRowY, { align: 'right' })
     // Remettre la couleur normale
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
   
-    yPosition = doc.lastAutoTable.finalY + 12
+    yPosition = doc.lastAutoTable.finalY + 10 // Espacement après le tableau
   
-    // Encadré pour le total avec style moderne
+    // Encadré pour le total avec style moderne - Espacement amélioré
     doc.setFillColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.roundedRect(margin, yPosition, contentWidth, 18, 5, 5, 'F')
+    doc.roundedRect(margin, yPosition, contentWidth, 12, 5, 5, 'F')
     
-    doc.setFontSize(16)
+    doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(255, 255, 255)
-    doc.text('TOTAL PAYÉ', margin + 10, yPosition + 8)
-    doc.text(formatCurrency(payment.montant_total), pageWidth - margin - 10, yPosition + 8, { align: 'right' })
+    doc.text('TOTAL PAYÉ', margin + 8, yPosition + 7)
+    const totalAmount = formatCurrency(payment.montant_total).replace(' FCFA', ' F')
+    doc.text(totalAmount, pageWidth - margin - 8, yPosition + 7, { align: 'right' })
   
-    yPosition += 25
+    yPosition += 18 // Espacement après le total
   
     // ============================================
     // PÉRIODE COUVERTE - Design moderne
@@ -429,42 +432,38 @@ export const generateReceiptPDF = async (payment, student) => {
     
     doc.setFillColor(lgRgb.r, lgRgb.g, lgRgb.b)
     doc.setGState(doc.GState({ opacity: 0.15 }))
-    doc.roundedRect(margin, yPosition, contentWidth, 25, 5, 5, 'F')
+    doc.roundedRect(margin, yPosition, contentWidth, 20, 5, 5, 'F')
     doc.setGState(doc.GState({ opacity: 1 }))
   
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.text('PÉRIODE COUVERTE', margin + 5, yPosition + 8)
+    doc.text('PÉRIODE COUVERTE', margin + 5, yPosition + 6)
     
-    doc.setFontSize(10)
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     
     const startDate = formatDateFrench(payment.date_debut)
     const endDate = formatDateFrench(payment.date_fin)
     
-    doc.text(`Du ${startDate}`, margin + 5, yPosition + 14)
-    doc.text(`Au ${endDate}`, margin + 5, yPosition + 19)
-    
-    // Icône de calendrier (simulée avec texte)
-    doc.setFontSize(8)
-    doc.setTextColor(gmRgb.r, gmRgb.g, gmRgb.b)
-    doc.text('📅', pageWidth - margin - 30, yPosition + 14)
+    doc.text(`Du ${startDate}`, margin + 5, yPosition + 11)
+    doc.text(`Au ${endDate}`, margin + 5, yPosition + 16)
   
-    yPosition += 32
+    yPosition += 25 // Espacement après la période
   
     // ============================================
     // FOOTER - QR Code et Informations (Design moderne)
     // ============================================
     
-    // Séparateur décoratif
-    hr(doc, yPosition, { r: yRgb.r, g: yRgb.g, b: yRgb.b }, 2, margin, pageWidth - margin)
+    // Séparateur décoratif - Bande jaune
+    doc.setFillColor(yRgb.r, yRgb.g, yRgb.b)
+    doc.rect(0, yPosition, pageWidth, 3, 'F')
     
-    yPosition += 8
+    yPosition += 8 // Espacement après le séparateur
   
-    // QR Code dans un encadré moderne
-    const qrCodeSize = 40
+    // QR Code dans un encadré moderne - Taille réduite pour éviter superposition
+    const qrCodeSize = 35
     const qrCodeX = margin
     const qrCodeY = yPosition
     
@@ -472,7 +471,7 @@ export const generateReceiptPDF = async (payment, student) => {
     doc.setFillColor(glRgb.r, glRgb.g, glRgb.b)
     doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
     doc.setLineWidth(1)
-    doc.roundedRect(qrCodeX, qrCodeY, qrCodeSize + 4, qrCodeSize + 20, 3, 3, 'FD')
+    doc.roundedRect(qrCodeX, qrCodeY, qrCodeSize + 4, qrCodeSize + 12, 3, 3, 'FD')
     
     try {
       const qrCodeDataUrl = await generateQRCode(receiptNumber, payment.id)
@@ -480,17 +479,17 @@ export const generateReceiptPDF = async (payment, student) => {
         doc.addImage(qrCodeDataUrl, 'PNG', qrCodeX + 2, qrCodeY + 2, qrCodeSize, qrCodeSize)
         
         // Texte sous le QR code
-        doc.setFontSize(7)
+        doc.setFontSize(6)
         doc.setFont('helvetica', 'normal')
         doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
-        doc.text('Scanner pour vérifier', qrCodeX + qrCodeSize / 2 + 2, qrCodeY + qrCodeSize + 10, { align: 'center' })
+        doc.text('Scanner pour vérifier', qrCodeX + qrCodeSize / 2 + 2, qrCodeY + qrCodeSize + 8, { align: 'center' })
       }
     } catch (error) {
       console.error('Erreur lors de l\'ajout du QR code:', error)
     }
   
-    // Informations école dans un encadré moderne
-    const infoX = qrCodeX + qrCodeSize + 15
+    // Informations école dans un encadré moderne - Espacement amélioré
+    const infoX = qrCodeX + qrCodeSize + 10
     const infoWidth = pageWidth - infoX - margin
     const infoY = qrCodeY
     
@@ -498,26 +497,26 @@ export const generateReceiptPDF = async (payment, student) => {
     doc.setFillColor(glRgb.r, glRgb.g, glRgb.b)
     doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
     doc.setLineWidth(1)
-    doc.roundedRect(infoX, infoY, infoWidth, qrCodeSize + 20, 3, 3, 'FD')
+    doc.roundedRect(infoX, infoY, infoWidth, qrCodeSize + 12, 3, 3, 'FD')
     
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.text('École Multinationale Supérieure', infoX + 3, infoY + 6)
-    doc.text('des Postes d\'Abidjan', infoX + 3, infoY + 11)
+    doc.text('École Multinationale Supérieure', infoX + 3, infoY + 5)
+    doc.text('des Postes d\'Abidjan', infoX + 3, infoY + 9)
     
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
+    doc.setFontSize(7)
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
-    doc.text('📍 18 BP 42 Abidjan 18', infoX + 3, infoY + 17)
-    doc.text('Treichville, Zone 3, Km4', infoX + 3, infoY + 22)
-    doc.text('📞 +225 27 21 21 45 60', infoX + 3, infoY + 27)
-    doc.text('✉️ contact@emsp.int', infoX + 3, infoY + 32)
+    doc.text('18 BP 42 Abidjan 18', infoX + 3, infoY + 13)
+    doc.text('Treichville, Zone 3, Km4', infoX + 3, infoY + 17)
+    doc.text('+225 27 21 21 45 60', infoX + 3, infoY + 21)
+    doc.text('contact@emsp.int', infoX + 3, infoY + 25)
   
-    // Signature (en bas)
-    const signatureY = pageHeight - margin - 25
+    // Signature (en bas) - Position ajustée
+    const signatureY = pageHeight - margin - 20
     
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
     doc.text('L\'Administration EMSP', pageWidth - margin, signatureY, { align: 'right' })
@@ -526,10 +525,10 @@ export const generateReceiptPDF = async (payment, student) => {
     hr(doc, signatureY + 3, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 1, pageWidth - margin - 50, pageWidth - margin)
   
     // Numéro de page (si plusieurs pages)
-    doc.setFontSize(8)
+    doc.setFontSize(7)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(gmRgb.r, gmRgb.g, gmRgb.b)
-    doc.text(`Page 1/1`, pageWidth / 2, pageHeight - 10, { align: 'center' })
+    doc.text(`Page 1/1`, pageWidth / 2, pageHeight - 8, { align: 'center' })
 
     return doc
   } catch (error) {
