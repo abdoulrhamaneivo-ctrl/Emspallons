@@ -90,7 +90,7 @@ export default function StudentForm({ student, onClose, onSuccess }) {
         tuteur: student.tuteur || '',
         ligne_id: student.ligne_id || '',
         point_ramassage: student.point_ramassage || '',
-        niveau: student.niveau || '',
+        niveau: student.niveau || student.promotion || '', // Utiliser niveau (nom de la colonne dans la DB après migration)
         classe: student.classe || '',
       })
     }
@@ -201,6 +201,10 @@ export default function StudentForm({ student, onClose, onSuccess }) {
             {/* Nom */}
             <Input
               label="Nom *"
+              type="text"
+              inputMode="text"
+              autoComplete="given-name"
+              autoCapitalize="words"
               value={formData.nom}
               onChange={(e) => handleChange('nom', e.target.value)}
               error={errors.nom}
@@ -210,6 +214,10 @@ export default function StudentForm({ student, onClose, onSuccess }) {
             {/* Prénom */}
             <Input
               label="Prénom"
+              type="text"
+              inputMode="text"
+              autoComplete="family-name"
+              autoCapitalize="words"
               value={formData.prenom}
               onChange={(e) => handleChange('prenom', e.target.value)}
               error={errors.prenom}
@@ -241,6 +249,9 @@ export default function StudentForm({ student, onClose, onSuccess }) {
                   ))}
                 </Select>
                 <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={formData.contact}
                   onChange={(e) => {
                     const formatted = formatPhoneNumber(e.target.value, phoneCountry)
@@ -260,6 +271,10 @@ export default function StudentForm({ student, onClose, onSuccess }) {
             {/* Tuteur */}
             <Input
               label="Tuteur"
+              type="text"
+              inputMode="text"
+              autoComplete="name"
+              autoCapitalize="words"
               value={formData.tuteur}
               onChange={(e) => handleChange('tuteur', e.target.value)}
               error={errors.tuteur}
@@ -286,6 +301,10 @@ export default function StudentForm({ student, onClose, onSuccess }) {
             {/* Point de ramassage */}
             <Input
               label="Point de ramassage *"
+              type="text"
+              inputMode="text"
+              autoComplete="address-line1"
+              autoCapitalize="words"
               value={formData.point_ramassage}
               onChange={(e) => handleChange('point_ramassage', e.target.value)}
               error={errors.point_ramassage}

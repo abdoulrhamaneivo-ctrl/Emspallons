@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx'
 import { supabase } from './supabase'
+import { genererCodeQR } from './utils'
+import { detectCountry, formatPhoneNumber } from './phoneFormatter'
 
 /**
  * Exporte les étudiants en JSON
@@ -39,7 +41,7 @@ export const exportStudentsToCSV = (students) => {
     student.tuteur || '',
     student.lines?.nom || '',
     student.point_ramassage || '',
-    student.niveau || '',
+    student.niveau || student.promotion || '', // Utiliser niveau (nom de la colonne dans la DB après migration)
     student.classe || '',
     student.statut_paiement || '',
   ])
@@ -76,7 +78,7 @@ export const exportStudentsToExcel = (students) => {
       'Tuteur': student.tuteur || '',
       'Ligne': student.lines?.nom || '',
       'Point de ramassage': student.point_ramassage || '',
-      'Niveau': student.niveau || '',
+      'Niveau': student.promotion || student.niveau || '', // Utiliser promotion (champ DB) ou niveau comme fallback
       'Classe': student.classe || '',
       'Statut paiement': student.statut_paiement || '',
     }))
@@ -162,26 +164,48 @@ export const parseExcelFile = async (file) => {
  * Mappe les données importées vers le format étudiants
  */
 export const mapImportedDataToStudents = (data, lines) => {
-  // Vérifier que data est un tableau
-  if (!Array.isArray(data)) {
-    console.error('mapImportedDataToStudents: data is not an array', data)
+  // Gérer le cas où data est un objet d'export complet (structure avec exportDate, version, students, etc.)
+  let studentsData = data
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    // Si c'est un objet d'export complet, extraire le tableau students
+    if (data.students && Array.isArray(data.students)) {
+      studentsData = data.students
+    } else {
+      console.error('mapImportedDataToStudents: data is not an array and has no students property', data)
+      return []
+    }
+  }
+  
+  // Vérifier que studentsData est un tableau
+  if (!Array.isArray(studentsData)) {
+    console.error('mapImportedDataToStudents: studentsData is not an array', studentsData)
     return []
   }
   
   // Vérifier que lines est un tableau
   const linesArray = Array.isArray(lines) ? lines : []
   
-  return data.map((row) => {
+  return studentsData.map((row) => {
     // Mapping flexible des colonnes
     const nom = row.Nom || row.nom || row['Nom'] || ''
     const prenom = row.Prénom || row.prenom || row['Prénom'] || ''
-    const contact = row.Contact || row.contact || row['Contact'] || ''
+    const contactRaw = row.Contact || row.contact || row['Contact'] || ''
     const tuteur = row.Tuteur || row.tuteur || row['Tuteur'] || ''
     const ligneNom = row.Ligne || row.ligne || row['Ligne'] || ''
     const pointRamassage = row['Point de ramassage'] || row.point_ramassage || row['Point de ramassage'] || ''
     const niveau = row.Niveau || row.niveau || row['Niveau'] || ''
     const classe = row.Classe || row.classe || row['Classe'] || ''
-    const qrToken = row['QR Token'] || row.qr_code_token || row.qrToken || ''
+    
+    // IMPORTANT : Formater automatiquement le numéro de téléphone selon le pays détecté
+    // Détecter le pays à partir du numéro (CI, ML, SN, TG, BJ, MR, BF)
+    let contact = contactRaw
+    if (contactRaw) {
+      const detectedCountry = detectCountry(contactRaw)
+      contact = formatPhoneNumber(contactRaw, detectedCountry)
+    }
+    
+    // IMPORTANT : Ne pas inclure le qr_code_token lors de l'import
+    // Un nouveau code QR sera toujours généré lors de la création de l'étudiant
     
     // Trouver la ligne par nom
     const ligne = linesArray.find(l => l.nom === ligneNom)
@@ -189,13 +213,13 @@ export const mapImportedDataToStudents = (data, lines) => {
     return {
       nom,
       prenom,
-      contact,
+      contact, // Contact formaté automatiquement selon le pays
       tuteur,
       ligne_id: ligne?.id || null,
       point_ramassage: pointRamassage,
-      niveau,
+      niveau, // Utiliser niveau (nom de la colonne dans la DB après migration)
       classe,
-      qr_code_token: qrToken || undefined,
+      // qr_code_token est intentionnellement omis - sera généré lors de la création
     }
   }).filter(student => student.nom && student.contact) // Filtrer les lignes vides
 }
@@ -217,16 +241,43 @@ export const importStudentsFromData = async (data, onProgress) => {
       // Trouver la ligne
       const ligne = lines?.find(l => l.nom === row.Ligne || l.nom === row.ligne)
       
-      // Créer l'étudiant
+      // IMPORTANT : Toujours générer un nouveau code QR lors de l'import
+      // Ne pas utiliser qr_code_token du fichier importé, même s'il existe
+      
+      // Validation des champs requis
+      const nom = row.Nom || row.nom
+      const contactRaw = row.Contact || row.contact
+      // Utiliser Niveau/Promotion du fichier (peu importe le nom de la colonne dans le fichier)
+      const niveauFromFile = row.Niveau || row.niveau || row.Promotion || row.promotion || ''
+      
+      if (!nom || !contactRaw) {
+        throw new Error('Nom et Contact sont requis')
+      }
+      
+      // IMPORTANT : Formater automatiquement le numéro de téléphone selon le pays détecté
+      // Détecter le pays à partir du numéro (CI, ML, SN, TG, BJ, MR, BF)
+      const detectedCountry = detectCountry(contactRaw)
+      const contact = formatPhoneNumber(contactRaw, detectedCountry)
+      
+      // S'assurer que niveau est toujours défini et non vide (champ NOT NULL dans la DB)
+      const niveauValue = niveauFromFile ? niveauFromFile.toString().trim() : 'Non spécifié'
+      
+      // Générer un nouveau code QR pour chaque étudiant importé
+      const qrToken = genererCodeQR()
+      
+      // Créer l'étudiant avec un nouveau code QR généré
       const { error } = await supabase.from('students').insert([{
-        nom: row.Nom || row.nom,
+        nom,
         prenom: row.Prénom || row.prenom || '',
-        contact: row.Contact || row.contact,
+        contact, // Contact formaté automatiquement selon le pays
         tuteur: row.Tuteur || row.tuteur || '',
         ligne_id: ligne?.id || null,
         point_ramassage: row['Point de ramassage'] || row.point_ramassage || '',
-        niveau: row.Niveau || row.niveau || '',
+        niveau: niveauValue, // Utiliser niveau (nom de la colonne dans la DB après migration)
         classe: row.Classe || row.classe || '',
+        qr_code_token: qrToken,
+        qr_code_status: 'active',
+        months_ledger: [], // Initialiser explicitement
       }])
       
       if (error) throw error

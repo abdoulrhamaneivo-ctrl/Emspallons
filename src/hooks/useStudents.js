@@ -165,11 +165,22 @@ export const useStudents = () => {
     try {
       const qrToken = studentData.qr_code_token || genererCodeQR()
       
+      // IMPORTANT : La colonne dans la DB s'appelle "niveau" (après migration)
+      // Le schéma original utilisait "promotion" mais a été renommé en "niveau"
+      const { niveau: niveauField, promotion: promotionField, ...restData } = studentData
+      const niveau = (promotionField || niveauField || '').toString().trim()
+      
+      // S'assurer que niveau n'est jamais undefined ou null (champ NOT NULL)
+      if (!niveau) {
+        throw new Error('Le champ "Niveau/Promotion" est requis')
+      }
+      
       const dataToInsert = {
-        ...studentData,
+        ...restData,
+        niveau, // Utiliser niveau (nom de la colonne dans la DB après migration)
         qr_code_token: qrToken,
         qr_code_status: 'active',
-        months_ledger: [],
+        months_ledger: studentData.months_ledger || [],
       }
 
       const { data, error: createError } = await supabase
@@ -202,9 +213,20 @@ export const useStudents = () => {
 
   const updateStudent = async (id, studentData) => {
     try {
+      // IMPORTANT : La colonne dans la DB s'appelle "niveau" (après migration)
+      // Le schéma original utilisait "promotion" mais a été renommé en "niveau"
+      const { niveau: niveauField, promotion: promotionField, ...restData } = studentData
+      const updateData = { ...restData }
+      
+      // Gérer promotion/niveau - mapper vers niveau (nom de la colonne dans la DB)
+      if (niveauField !== undefined || promotionField !== undefined) {
+        const niveauValue = (promotionField || niveauField || '').toString().trim()
+        updateData.niveau = niveauValue || '' // Toujours définir niveau (même si vide)
+      }
+      
       const { data, error: updateError } = await supabase
         .from('students')
-        .update(studentData)
+        .update(updateData)
         .eq('id', id)
         .select(`
           *,
