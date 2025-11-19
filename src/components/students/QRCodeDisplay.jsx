@@ -41,10 +41,21 @@ export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
     const img = new Image()
 
     img.onload = () => {
-      canvas.width = img.width
-      canvas.height = img.height
-      ctx.drawImage(img, 0, 0)
-      const pngFile = canvas.toDataURL('image/png')
+      // Taille haute résolution pour un QR code net (2048x2048px)
+      // Cela permet un scan facile même sur de petits écrans ou après impression
+      const targetSize = 2048
+      canvas.width = targetSize
+      canvas.height = targetSize
+      
+      // Activer le lissage pour une meilleure qualité
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      
+      // Dessiner l'image SVG redimensionnée sur le canvas haute résolution
+      ctx.drawImage(img, 0, 0, targetSize, targetSize)
+      
+      // Générer le PNG avec la meilleure qualité possible
+      const pngFile = canvas.toDataURL('image/png', 1.0)
 
       const downloadLink = document.createElement('a')
       downloadLink.download = `QR-${student.nom}-${student.prenom || 'student'}.png`

@@ -9,6 +9,7 @@ import { STATUTS_SCAN, STATUTS_PAIEMENT } from '../../lib/constants'
 import toast from 'react-hot-toast'
 import logger from '../../lib/logger'
 import ControllerLogin from './ControllerLogin'
+import { useBreakpoint } from '../../hooks/useBreakpoint'
 
 // Précharger ControllerHistory pour éviter pages blanches
 let ControllerHistoryPreloaded = false
@@ -22,6 +23,7 @@ const preloadControllerHistory = () => {
 
 export default function ControllerScanner() {
   const navigate = useNavigate()
+  const { isMobile } = useBreakpoint()
   const [controller, setController] = useState(null)
   const [scanning, setScanning] = useState(false)
   const [scanResult, setScanResult] = useState(null)
@@ -179,16 +181,25 @@ export default function ControllerScanner() {
       }
 
       // 2. VÉRIFICATION DOUBLONS (PRIORITÉ)
-      // Vérifier si ce même étudiant a été scanné par ce contrôleur dans la dernière heure
+      // Vérifier si ce même étudiant a été scanné par CE MÊME contrôleur dans la dernière heure
       // IMPORTANT : Chercher le PREMIER scan (plus ancien) pour afficher l'heure du premier scan
-      // NOTE : On inclut TOUS les statuts (approved, wrong_line, expired) pour éviter les doublons
-      // même si le premier scan était refusé (ex: ligne incorrecte)
+      // NOTE : On vérifie tous les scans enregistrés (approved, expired) pour éviter les doublons
+      // Les scans avec ligne incorrecte ne sont pas enregistrés donc n'apparaissent pas ici
+      // IMPORTANT : On vérifie seulement les scans du MÊME contrôleur pour éviter les conflits entre contrôleurs
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
       const { data: recentScans, error: recentScansError } = await supabase
         .from('scan_logs')
-        .select('scanned_at, statut')
+        .select(`
+          scanned_at,
+          statut,
+          controllers:controller_id (
+            id,
+            nom,
+            code
+          )
+        `)
         .eq('student_id', student.id)
-        .eq('controller_id', controller.id)
+        .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
         .gte('scanned_at', oneHourAgo)
         .order('scanned_at', { ascending: true }) // Ordre ascendant pour avoir le premier scan
         .limit(1)
@@ -203,22 +214,42 @@ export default function ControllerScanner() {
         const minutesAgo = Math.floor((Date.now() - firstScan.getTime()) / 60000)
         const nextScanIn = 60 - minutesAgo
         
-        // Formater l'heure du premier scan
+        // Formater l'heure du premier scan avec date complète
         const firstScanTime = new Intl.DateTimeFormat('fr-FR', {
           hour: '2-digit',
-          minute: '2-digit'
+          minute: '2-digit',
+          second: '2-digit',
+          day: '2-digit',
+          month: '2-digit'
         }).format(firstScan)
+
+        // Récupérer le nom du contrôleur qui a scanné
+        const controllerName = recentScans[0].controllers?.nom || controller.name || 'Contrôleur'
 
         setScanResult({
           success: false,
           statut: STATUTS_SCAN.DUPLICATE,
-          message: `🚫 Déjà scanné à ${firstScanTime} (il y a ${minutesAgo} min). Prochain scan dans ${nextScanIn} min.`,
+          message: `🚫 Déjà scanné par ${controllerName} le ${firstScanTime} (il y a ${minutesAgo} min). Prochain scan dans ${nextScanIn} min.`,
           student,
           bgColor: 'bg-orange-500',
         })
         vibrate([100, 50, 100])
         
-        // IMPORTANT : Ne PAS enregistrer dans scan_logs pour les doublons
+        // IMPORTANT : Enregistrer TOUS les scans, y compris les doublons, avec statut DUPLICATE
+        // Cela permet à la fonction de réinitialisation de supprimer ces scans et de permettre un nouveau scan
+        try {
+          await supabase.from('scan_logs').insert([
+            {
+              student_id: student.id,
+              controller_id: controller.id,
+              statut: STATUTS_SCAN.DUPLICATE,
+              statut_paiement: student.statut_paiement,
+            },
+          ])
+        } catch (insertError) {
+          logger.debug('Erreur enregistrement scan doublon (non bloquant)', insertError)
+        }
+        
         // Redémarrer le scanner après 3 secondes
         setTimeout(() => {
           if (controllerRef.current && !scanning) {
@@ -233,20 +264,8 @@ export default function ControllerScanner() {
         const studentLine = student.lines?.nom || 'Inconnue'
         const controllerLine = controller.line_name || 'Inconnue'
 
-        // Enregistrer dans scan_logs pour traçabilité
-        const { error: insertError } = await supabase.from('scan_logs').insert([
-          {
-            student_id: student.id,
-            controller_id: controller.id,
-            statut: STATUTS_SCAN.WRONG_LINE,
-            statut_paiement: student.statut_paiement,
-            raison: `Ligne incorrecte. Étudiant: ${studentLine}, Contrôleur: ${controllerLine}`,
-          },
-        ])
-
-        if (insertError) {
-          logger.error('Error inserting wrong line scan log', insertError)
-        }
+        // IMPORTANT : Ne PAS enregistrer dans scan_logs pour les lignes incorrectes
+        // (comme pour les doublons, cela évite de polluer les logs avec des erreurs de ligne)
 
         setScanResult({
           success: false,
@@ -329,6 +348,37 @@ export default function ControllerScanner() {
         logger.error('Error inserting scan log', insertError)
         // Continue même si l'enregistrement échoue (ne pas bloquer l'affichage)
         toast.error('Erreur lors de l\'enregistrement du scan')
+      } else {
+        // Logger dans activity_logs pour traçabilité complète
+        try {
+          const { error: activityError } = await supabase.from('activity_logs').insert([
+            {
+              action: 'scan_qr_code',
+              entity_type: 'student',
+              entity_id: student.id,
+              details: {
+                controller_id: controller.id,
+                controller_name: controller.name,
+                controller_code: controller.code,
+                student_name: `${student.nom} ${student.prenom || ''}`,
+                student_contact: student.contact,
+                statut: scanStatus,
+                statut_paiement: student.statut_paiement,
+                message,
+                ligne_id: controller.ligne_id,
+                ligne_name: controller.line_name,
+              },
+            },
+          ])
+
+          if (activityError) {
+            logger.debug('Error logging scan activity', activityError)
+            // Non bloquant
+          }
+        } catch (logError) {
+          logger.debug('Error logging scan activity', logError)
+          // Non bloquant
+        }
       }
 
       setScanResult({
@@ -413,10 +463,16 @@ export default function ControllerScanner() {
       const html5QrCode = new Html5Qrcode('qr-reader')
       html5QrCodeRef.current = html5QrCode
 
-      // Configuration du scanner
+      // Configuration du scanner - Responsive pour mobile
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const qrboxSize = isMobile 
+        ? Math.min(Math.min(viewportWidth * 0.8, viewportHeight * 0.5), 280) // Max 80% de largeur ou 50% hauteur sur mobile, max 280px
+        : 300 // Desktop : 300px
+      
       const config = {
         fps: 10,
-        qrbox: { width: 300, height: 300 },
+        qrbox: { width: qrboxSize, height: qrboxSize },
         aspectRatio: 1.0,
         disableFlip: false,
       }
@@ -509,56 +565,91 @@ export default function ControllerScanner() {
     setScanning(false)
   }, [])
 
-  // Fonction de réinitialisation des scans - Supprime les scans d'aujourd'hui
-  // Permet de rescanner les étudiants sans avoir de doublons
-  // Utile quand un contrôleur et un étudiant discutent et veulent reprendre le scan
+  // Fonction de réinitialisation des scans - Supprime les scans de la dernière heure pour CE contrôleur uniquement
+  // Permet à ce contrôleur de rescanner tous les étudiants qu'il a déjà scannés dans l'heure sans avoir de doublons
+  // Chaque contrôleur peut réinitialiser ses propres scans indépendamment des autres contrôleurs
   const resetTodayScans = async () => {
-    if (!controller?.id) {
-      toast.error('Contrôleur non connecté')
+    if (!controller?.id || !controller?.line_id) {
+      toast.error('Contrôleur non connecté ou ligne non assignée')
       return
     }
 
-    // Calculer le début de la journée (00:00:00 aujourd'hui)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayStart = today.toISOString()
+    // Calculer la date d'il y a 1 heure
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-    // Compter les scans d'aujourd'hui pour afficher dans la confirmation
+    // Compter TOUS les scans de CE contrôleur dans la dernière heure (peu importe la ligne de l'étudiant)
+    // Cela inclut les scans approuvés, expirés, doublons, et ligne incorrecte
     const { count: scansCount } = await supabase
       .from('scan_logs')
       .select('*', { count: 'exact', head: true })
-      .eq('controller_id', controller.id)
-      .gte('scanned_at', todayStart)
+      .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
+      .gte('scanned_at', oneHourAgo) // Dans la dernière heure
 
-    if (!confirm(`Réinitialiser les scans d'aujourd'hui ?\n\n${scansCount || 0} scan(s) effectué(s) aujourd'hui seront supprimés, permettant de rescanner les étudiants sans doublons.`)) {
+    if (!confirm(`Réinitialiser vos scans de la dernière heure ?\n\n${scansCount || 0} scan(s) que VOUS avez effectués dans la dernière heure seront supprimés.\n\nVous pourrez rescanner immédiatement tous les étudiants que vous avez déjà scannés.`)) {
       return
     }
 
     try {
-      // Supprimer tous les scans d'aujourd'hui (depuis 00:00:00) pour ce contrôleur
-      // Cela permet de rescanner les étudiants sans avoir de message de doublon
+      // IMPORTANT : Supprimer TOUS les scans de CE contrôleur dans la dernière heure
+      // Peu importe la ligne de l'étudiant ou le statut du scan (approved, duplicate, expired, wrong_line)
+      // Cela permet à ce contrôleur de rescanner immédiatement les étudiants qu'il a déjà scannés
+      // Les autres contrôleurs ne sont pas affectés
       const { error } = await supabase
         .from('scan_logs')
         .delete()
-        .eq('controller_id', controller.id)
-        .gte('scanned_at', todayStart)
+        .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
+        .gte('scanned_at', oneHourAgo) // Dans la dernière heure
 
       if (error) {
-        logger.error('Erreur réinitialisation scans', error)
+        logger.error('Erreur réinitialisation scans ligne', error)
         throw error
       }
 
-      toast.success(`Scans d'aujourd'hui réinitialisés (${scansCount || 0} scan(s) supprimé(s)). Vous pouvez maintenant rescanner les étudiants.`)
+      // Logger dans activity_logs pour traçabilité
+      try {
+        const { error: activityError } = await supabase.from('activity_logs').insert([
+          {
+            action: 'reset_scans_hour',
+            entity_type: 'controller',
+            entity_id: controller.id,
+            details: {
+              controller_id: controller.id,
+              controller_name: controller.name,
+              controller_code: controller.code,
+              ligne_id: controller.line_id,
+              ligne_name: controller.line_name,
+              scans_deleted: scansCount || 0,
+              reset_scope: 'controller_only', // Réinitialisation uniquement pour ce contrôleur
+            },
+          },
+        ])
+
+        if (activityError) {
+          logger.debug('Error logging reset scans activity', activityError)
+          // Non bloquant
+        }
+      } catch (logError) {
+        logger.debug('Error logging reset scans activity', logError)
+        // Non bloquant
+      }
+
+      toast.success(`Vos scans de la dernière heure ont été réinitialisés. ${scansCount || 0} scan(s) supprimé(s). Vous pouvez maintenant rescanner immédiatement tous les étudiants que vous avez déjà scannés.`, {
+        duration: 5000
+      })
       
-      logger.info('Réinitialisation scans contrôleur (aujourd\'hui)', {
+      logger.info('Réinitialisation scans contrôleur (dernière heure)', {
         controller_id: controller.id,
-        today_start: todayStart,
+        controller_name: controller.name,
+        controller_code: controller.code,
+        ligne_id: controller.line_id,
+        ligne_name: controller.line_name,
+        one_hour_ago: oneHourAgo,
         scans_deleted: scansCount || 0,
         timestamp: new Date().toISOString()
       })
 
     } catch (error) {
-      logger.error('Erreur réinitialisation scans', error)
+      logger.error('Erreur réinitialisation scans ligne', error)
       toast.error('Erreur lors de la réinitialisation : ' + (error.message || 'Erreur inconnue'))
     }
   }
@@ -598,14 +689,91 @@ export default function ControllerScanner() {
 
   // Écran 2 : Scanner actif
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* En-tête avec infos contrôleur */}
-      <div className="bg-emsp-green text-white shadow-md p-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-gray-100 overflow-x-hidden">
+      {/* En-tête avec infos contrôleur - Responsive mobile */}
+      <div className="bg-emsp-green text-white shadow-md p-3 md:p-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Mobile : Layout vertical */}
+          {isMobile ? (
+            <div className="space-y-3">
+              {/* Ligne 1 : Nom et avatar */}
+              <div className="flex items-center space-x-3">
+                <div
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-base md:text-lg flex-shrink-0"
+                >
+                  {getInitials(controller.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-base md:text-xl font-bold truncate">{controller.name}</h1>
+                  {controller.line_name && (
+                    <Badge
+                      className="mt-1 bg-white/20 text-white border-white/30 text-xs"
+                      style={{
+                        backgroundColor: controller.line_color || '#7CB342',
+                      }}
+                    >
+                      {controller.line_name}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              {/* Ligne 2 : Boutons */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <button
+                  onClick={resetTodayScans}
+                  className="p-2 bg-white/20 hover:bg-white/30 active:bg-white/40 text-white rounded-lg transition-colors touch-manipulation flex-shrink-0"
+                  style={{ 
+                    minWidth: '44px',
+                    minHeight: '44px',
+                    touchAction: 'manipulation'
+                  }}
+                  title="Réinitialiser vos scans de la dernière heure (vous pourrez rescanner immédiatement)"
+                  aria-label="Réinitialiser scans"
+                >
+                  <RefreshCcw className="w-5 h-5" />
+                </button>
+                <div className="flex items-center gap-2 flex-1 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      preloadControllerHistory()
+                      startTransition(() => {
+                        navigate('/scanner/historique')
+                      })
+                    }}
+                    className="bg-white/20 hover:bg-white/30 active:bg-white/40 text-white border-white text-sm px-3 py-2 flex-shrink-0"
+                    style={{ 
+                      touchAction: 'manipulation',
+                      minWidth: '44px',
+                      minHeight: '44px'
+                    }}
+                  >
+                    <History size={16} className="md:mr-2" />
+                    <span className="hidden sm:inline">Historique</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleLogout}
+                    className="bg-white/20 hover:bg-white/30 active:bg-white/40 text-white border-white text-sm px-3 py-2 flex-shrink-0"
+                    style={{ 
+                      touchAction: 'manipulation',
+                      minWidth: '44px',
+                      minHeight: '44px'
+                    }}
+                  >
+                    <LogOut size={16} className="md:mr-2" />
+                    <span className="hidden sm:inline">Déconnexion</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Desktop : Layout horizontal */
+            <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             {/* Avatar avec initiales */}
             <div
-              className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg"
+                  className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
             >
               {getInitials(controller.name)}
             </div>
@@ -625,14 +793,19 @@ export default function ControllerScanner() {
               </div>
               <button
                 onClick={resetTodayScans}
-                className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
-                title="Réinitialiser les scans d&apos;aujourd&apos;hui"
+                    className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex-shrink-0"
+                    style={{ 
+                      touchAction: 'manipulation',
+                      minWidth: '44px',
+                      minHeight: '44px'
+                    }}
+                    title="Réinitialiser vos scans de la dernière heure (vous pourrez rescanner immédiatement)"
               >
                 <RefreshCcw className="w-5 h-5" />
               </button>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 flex-shrink-0">
             <Button
               variant="outline"
               onClick={() => {
@@ -643,6 +816,11 @@ export default function ControllerScanner() {
               }}
               onMouseEnter={preloadControllerHistory}
               className="bg-white/20 hover:bg-white/30 text-white border-white"
+                  style={{ 
+                    touchAction: 'manipulation',
+                    minWidth: '44px',
+                    minHeight: '44px'
+                  }}
             >
               <History size={18} className="mr-2" />
               Mon historique
@@ -651,21 +829,33 @@ export default function ControllerScanner() {
               variant="outline"
               onClick={handleLogout}
               className="bg-white/20 hover:bg-white/30 text-white border-white"
+                  style={{ 
+                    touchAction: 'manipulation',
+                    minWidth: '44px',
+                    minHeight: '44px'
+                  }}
             >
               <LogOut size={18} className="mr-2" />
               Déconnexion
             </Button>
           </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
+      <div className="max-w-4xl mx-auto p-3 md:p-4 space-y-3 md:space-y-4 overflow-x-hidden">
         {/* Contrôles */}
-        <div className="flex justify-center space-x-4">
+        <div className="flex justify-center">
           {!scanning ? (
             <Button
               onClick={startScanning}
-              className="bg-emsp-green hover:bg-green-800 text-white"
+              className="bg-emsp-green hover:bg-green-800 active:bg-green-900 text-white w-full sm:w-auto"
+              style={{ 
+                touchAction: 'manipulation',
+                minWidth: '44px',
+                minHeight: '44px'
+              }}
             >
               <CheckCircle size={20} className="mr-2" />
               Démarrer le scan
@@ -674,6 +864,12 @@ export default function ControllerScanner() {
             <Button
               onClick={stopScanning}
               variant="danger"
+              className="w-full sm:w-auto"
+              style={{ 
+                touchAction: 'manipulation',
+                minWidth: '44px',
+                minHeight: '44px'
+              }}
             >
               <XCircle size={20} className="mr-2" />
               Arrêter le scan
@@ -681,34 +877,43 @@ export default function ControllerScanner() {
           )}
         </div>
 
-        {/* Zone de scan */}
+        {/* Zone de scan - Responsive */}
         {scanning && (
-          <div className="bg-white rounded-lg p-4 shadow-md">
-            <div id="qr-reader" className="w-full" ref={scannerRef} style={{ minHeight: '300px' }}></div>
+          <div className="bg-white rounded-lg p-2 md:p-4 shadow-md overflow-hidden">
+            <div 
+              id="qr-reader" 
+              className="w-full" 
+              ref={scannerRef} 
+              style={{ 
+                minHeight: isMobile ? '250px' : '300px',
+                maxWidth: '100%',
+                overflow: 'hidden'
+              }}
+            ></div>
           </div>
         )}
 
-        {/* Résultat du scan */}
+        {/* Résultat du scan - Responsive */}
         {scanResult && (
           <div
-            className={`p-6 rounded-lg text-white text-center ${
+            className={`p-4 md:p-6 rounded-lg text-white text-center overflow-hidden ${
               scanResult.bgColor || (scanResult.success ? 'bg-green-500' : 'bg-red-500')
             }`}
           >
-            <p className="text-2xl font-bold mb-2">{scanResult.message}</p>
+            <p className="text-lg md:text-2xl font-bold mb-2 break-words">{scanResult.message}</p>
             {scanResult.student && (
-              <p className="text-lg opacity-90">
+              <p className="text-base md:text-lg opacity-90 break-words">
                 {scanResult.student.nom} {scanResult.student.prenom || ''}
               </p>
             )}
           </div>
         )}
 
-        {/* Instructions */}
+        {/* Instructions - Responsive */}
         {!scanning && !scanResult && (
-          <div className="bg-white rounded-lg p-6 shadow-md text-center">
-            <AlertCircle size={48} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600">
+          <div className="bg-white rounded-lg p-4 md:p-6 shadow-md text-center">
+            <AlertCircle size={isMobile ? 36 : 48} className="mx-auto text-gray-400 mb-3 md:mb-4" />
+            <p className="text-sm md:text-base text-gray-600 px-2">
                 Cliquez sur &quot;Démarrer le scan&quot; pour commencer à scanner les QR codes
               </p>
           </div>
