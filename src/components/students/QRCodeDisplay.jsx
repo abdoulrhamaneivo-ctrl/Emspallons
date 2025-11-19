@@ -200,15 +200,15 @@ Présentez ce code au contrôleur lors de l'embarquement.
 
         {/* Contenu */}
         <div className="p-6 space-y-6">
-          {/* QR Code */}
+          {/* QR Code - Taille augmentée pour meilleure lisibilité */}
           <div className="flex justify-center">
             <div
               ref={qrRef}
-              className="p-4 bg-white border-2 border-gray-200 rounded-lg"
+              className="p-6 bg-white border-2 border-gray-200 rounded-lg"
             >
               <QRCodeSVG
                 value={qrData}
-                size={256}
+                size={320}
                 level="H"
                 includeMargin={true}
                 fgColor="#2D5016"

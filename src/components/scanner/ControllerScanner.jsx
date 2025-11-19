@@ -754,19 +754,20 @@ export default function ControllerScanner() {
               </div>
               {/* Ligne 2 : Boutons */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <button
+                <Button
                   onClick={resetTodayScans}
-                  className="p-2 bg-white/20 hover:bg-white/30 active:bg-white/40 text-white rounded-lg transition-colors touch-manipulation flex-shrink-0"
+                  variant="outline"
+                  className="bg-white/20 hover:bg-white/30 active:bg-white/40 text-white border-white text-sm px-3 py-2 flex-shrink-0"
                   style={{ 
+                    touchAction: 'manipulation',
                     minWidth: '44px',
-                    minHeight: '44px',
-                    touchAction: 'manipulation'
+                    minHeight: '44px'
                   }}
-                  title="Réinitialiser vos scans de la dernière heure (vous pourrez rescanner immédiatement)"
-                  aria-label="Réinitialiser scans"
+                  title="Réinitialiser vos scans de la dernière heure (vous pourrez rescanner immédiatement tous les étudiants de votre ligne)"
                 >
-                  <RefreshCcw className="w-5 h-5" />
-                </button>
+                  <RefreshCcw size={16} className="md:mr-2" />
+                  <span className="hidden sm:inline">Réinitialiser scans 1h</span>
+                </Button>
                 <div className="flex items-center gap-2 flex-1 justify-end">
                   <Button
                     variant="outline"
@@ -826,18 +827,20 @@ export default function ControllerScanner() {
                   </Badge>
                 )}
               </div>
-              <button
+              <Button
                 onClick={resetTodayScans}
-                    className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex-shrink-0"
-                    style={{ 
-                      touchAction: 'manipulation',
-                      minWidth: '44px',
-                      minHeight: '44px'
-                    }}
-                    title="Réinitialiser vos scans de la dernière heure (vous pourrez rescanner immédiatement)"
+                variant="outline"
+                className="bg-white/20 hover:bg-white/30 active:bg-white/40 text-white border-white text-sm px-3 py-2 flex-shrink-0"
+                style={{ 
+                  touchAction: 'manipulation',
+                  minWidth: '44px',
+                  minHeight: '44px'
+                }}
+                title="Réinitialiser vos scans de la dernière heure (vous pourrez rescanner immédiatement tous les étudiants de votre ligne)"
               >
-                <RefreshCcw className="w-5 h-5" />
-              </button>
+                <RefreshCcw size={16} className="md:mr-2" />
+                <span className="hidden sm:inline">Réinitialiser scans 1h</span>
+              </Button>
             </div>
           </div>
               <div className="flex items-center space-x-2 flex-shrink-0">
