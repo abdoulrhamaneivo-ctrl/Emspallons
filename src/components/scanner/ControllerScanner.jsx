@@ -566,7 +566,8 @@ export default function ControllerScanner() {
   }, [])
 
   // Fonction de réinitialisation des scans - Supprime les scans de la dernière heure pour CE contrôleur uniquement
-  // Permet à ce contrôleur de rescanner tous les étudiants qu'il a déjà scannés dans l'heure sans avoir de doublons
+  // Permet à ce contrôleur de rescanner tous les étudiants de SA LIGNE dans l'heure sans avoir de doublons
+  // IMPORTANT : Impacte uniquement les étudiants de la ligne du contrôleur
   // Chaque contrôleur peut réinitialiser ses propres scans indépendamment des autres contrôleurs
   const resetTodayScans = async () => {
     if (!controller?.id || !controller?.line_id) {
@@ -577,27 +578,51 @@ export default function ControllerScanner() {
     // Calculer la date d'il y a 1 heure
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-    // Compter TOUS les scans de CE contrôleur dans la dernière heure (peu importe la ligne de l'étudiant)
-    // Cela inclut les scans approuvés, expirés, doublons, et ligne incorrecte
+    // Récupérer tous les étudiants de la ligne du contrôleur
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id')
+      .eq('ligne_id', controller.line_id)
+
+    if (studentsError) {
+      logger.error('Erreur récupération étudiants ligne', studentsError)
+      toast.error('Erreur lors de la récupération des étudiants de votre ligne')
+      return
+    }
+
+    const studentIds = students?.map(s => s.id) || []
+
+    if (studentIds.length === 0) {
+      toast.error('Aucun étudiant trouvé pour votre ligne')
+      return
+    }
+
+    // Compter les scans de CE contrôleur dans la dernière heure
+    // IMPORTANT : Uniquement pour les étudiants de SA LIGNE
+    // Cela inclut les scans approuvés, expirés, doublons
     const { count: scansCount } = await supabase
       .from('scan_logs')
       .select('*', { count: 'exact', head: true })
       .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
+      .in('student_id', studentIds) // Uniquement les étudiants de SA LIGNE
       .gte('scanned_at', oneHourAgo) // Dans la dernière heure
 
-    if (!confirm(`Réinitialiser vos scans de la dernière heure ?\n\n${scansCount || 0} scan(s) que VOUS avez effectués dans la dernière heure seront supprimés.\n\nVous pourrez rescanner immédiatement tous les étudiants que vous avez déjà scannés.`)) {
+    if (!confirm(`Réinitialiser vos scans de la dernière heure pour votre ligne ?\n\n${scansCount || 0} scan(s) que VOUS avez effectués dans la dernière heure pour les étudiants de votre ligne seront supprimés.\n\nVous pourrez rescanner immédiatement tous les étudiants de votre ligne que vous avez déjà scannés.`)) {
       return
     }
 
     try {
-      // IMPORTANT : Supprimer TOUS les scans de CE contrôleur dans la dernière heure
-      // Peu importe la ligne de l'étudiant ou le statut du scan (approved, duplicate, expired, wrong_line)
-      // Cela permet à ce contrôleur de rescanner immédiatement les étudiants qu'il a déjà scannés
+      // IMPORTANT : Supprimer uniquement les scans de CE contrôleur dans la dernière heure
+      // Uniquement pour les étudiants de SA LIGNE (controller.line_id)
+      // Peu importe le statut du scan (approved, duplicate, expired)
+      // Cela permet à ce contrôleur de rescanner immédiatement tous les étudiants de SA LIGNE
       // Les autres contrôleurs ne sont pas affectés
+      // Les étudiants d'autres lignes ne sont pas affectés
       const { error } = await supabase
         .from('scan_logs')
         .delete()
         .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
+        .in('student_id', studentIds) // Uniquement les étudiants de SA LIGNE
         .gte('scanned_at', oneHourAgo) // Dans la dernière heure
 
       if (error) {
@@ -619,7 +644,8 @@ export default function ControllerScanner() {
               ligne_id: controller.line_id,
               ligne_name: controller.line_name,
               scans_deleted: scansCount || 0,
-              reset_scope: 'controller_only', // Réinitialisation uniquement pour ce contrôleur
+              student_count: studentIds.length,
+              reset_scope: 'controller_line_only', // Réinitialisation uniquement pour ce contrôleur et sa ligne
             },
           },
         ])
@@ -633,7 +659,7 @@ export default function ControllerScanner() {
         // Non bloquant
       }
 
-      toast.success(`Vos scans de la dernière heure ont été réinitialisés. ${scansCount || 0} scan(s) supprimé(s). Vous pouvez maintenant rescanner immédiatement tous les étudiants que vous avez déjà scannés.`, {
+      toast.success(`Vos scans de la dernière heure pour votre ligne ont été réinitialisés. ${scansCount || 0} scan(s) supprimé(s). Vous pouvez maintenant rescanner immédiatement tous les étudiants de votre ligne que vous avez déjà scannés.`, {
         duration: 5000
       })
       
@@ -645,6 +671,7 @@ export default function ControllerScanner() {
         ligne_name: controller.line_name,
         one_hour_ago: oneHourAgo,
         scans_deleted: scansCount || 0,
+        student_count: studentIds.length,
         timestamp: new Date().toISOString()
       })
 
