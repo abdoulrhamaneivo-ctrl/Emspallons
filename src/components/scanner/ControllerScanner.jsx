@@ -183,9 +183,10 @@ export default function ControllerScanner() {
       // 2. VÉRIFICATION DOUBLONS (PRIORITÉ)
       // Vérifier si ce même étudiant a été scanné par CE MÊME contrôleur dans la dernière heure
       // IMPORTANT : Chercher le PREMIER scan (plus ancien) pour afficher l'heure du premier scan
-      // NOTE : On vérifie tous les scans enregistrés (approved, expired) pour éviter les doublons
-      // Les scans avec ligne incorrecte ne sont pas enregistrés donc n'apparaissent pas ici
+      // NOTE : On vérifie tous les scans enregistrés (approved, expired, duplicate) pour éviter les doublons
       // IMPORTANT : On vérifie seulement les scans du MÊME contrôleur pour éviter les conflits entre contrôleurs
+      // IMPORTANT : Après une réinitialisation, tous les scans de la dernière heure sont supprimés de la DB,
+      // donc cette vérification trouvera 0 scans et le nouveau scan sera accepté sans être marqué comme doublon
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
       const { data: recentScans, error: recentScansError } = await supabase
         .from('scan_logs')
@@ -200,7 +201,7 @@ export default function ControllerScanner() {
         `)
         .eq('student_id', student.id)
         .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
-        .gte('scanned_at', oneHourAgo)
+        .gte('scanned_at', oneHourAgo) // Dans la dernière heure (les scans supprimés par réinitialisation ne seront plus ici)
         .order('scanned_at', { ascending: true }) // Ordre ascendant pour avoir le premier scan
         .limit(1)
 
@@ -209,6 +210,9 @@ export default function ControllerScanner() {
         // Continue le processus même en cas d'erreur (ne pas bloquer le scan)
       }
 
+      // Si aucun scan récent trouvé (length === 0 ou null), cela signifie :
+      // - Soit c'est le premier scan de cet étudiant par ce contrôleur dans l'heure
+      // - Soit la réinitialisation a supprimé les scans précédents → le nouveau scan sera accepté
       if (recentScans && recentScans.length > 0) {
         const firstScan = new Date(recentScans[0].scanned_at) // Premier scan (le plus ancien)
         const minutesAgo = Math.floor((Date.now() - firstScan.getTime()) / 60000)
@@ -659,9 +663,13 @@ export default function ControllerScanner() {
         // Non bloquant
       }
 
-      toast.success(`Vos scans de la dernière heure pour votre ligne ont été réinitialisés. ${scansCount || 0} scan(s) supprimé(s). Vous pouvez maintenant rescanner immédiatement tous les étudiants de votre ligne que vous avez déjà scannés.`, {
-        duration: 5000
+      toast.success(`Vos scans de la dernière heure pour votre ligne ont été réinitialisés. ${scansCount || 0} scan(s) supprimé(s).\n\n✅ Vous pouvez maintenant rescanner immédiatement tous les étudiants de votre ligne sans qu'ils soient marqués comme doublons.`, {
+        duration: 6000
       })
+      
+      // IMPORTANT : Forcer une petite pause pour s'assurer que la suppression est bien propagée dans la DB
+      // avant de permettre un nouveau scan (évite les problèmes de cache/réplication)
+      await new Promise(resolve => setTimeout(resolve, 500))
       
       logger.info('Réinitialisation scans contrôleur (dernière heure)', {
         controller_id: controller.id,
