@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 import logger from '../../lib/logger'
 import ControllerLogin from './ControllerLogin'
 import { useBreakpoint } from '../../hooks/useBreakpoint'
+import { logActivity, ACTIONS } from '../../lib/activityLogger'
 
 // Précharger ControllerHistory pour éviter pages blanches
 let ControllerHistoryPreloaded = false
@@ -188,6 +189,11 @@ export default function ControllerScanner() {
       // IMPORTANT : Après une réinitialisation, tous les scans de la dernière heure sont supprimés de la DB,
       // donc cette vérification trouvera 0 scans et le nouveau scan sera accepté sans être marqué comme doublon
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+      
+      // IMPORTANT : Utiliser une requête fraîche pour garantir que les scans supprimés par réinitialisation
+      // ne sont pas retournés par un cache obsolète
+      // La requête Supabase est déjà fraîche par défaut, mais on peut ajouter un petit délai
+      // si une réinitialisation vient d'avoir lieu (géré dans resetTodayScans)
       const { data: recentScans, error: recentScansError } = await supabase
         .from('scan_logs')
         .select(`
@@ -209,6 +215,15 @@ export default function ControllerScanner() {
         logger.error('Error checking duplicate scans', recentScansError)
         // Continue le processus même en cas d'erreur (ne pas bloquer le scan)
       }
+      
+      // Logger pour traçabilité et debug
+      logger.debug('Vérification doublons', {
+        student_id: student.id,
+        controller_id: controller.id,
+        one_hour_ago: oneHourAgo,
+        recent_scans_count: recentScans?.length || 0,
+        has_recent_scans: recentScans && recentScans.length > 0,
+      })
 
       // Si aucun scan récent trouvé (length === 0 ou null), cela signifie :
       // - Soit c'est le premier scan de cet étudiant par ce contrôleur dans l'heure
@@ -634,13 +649,38 @@ export default function ControllerScanner() {
         throw error
       }
 
+      // VÉRIFIER que la suppression a bien réussi
+      // Attendre un peu pour que la suppression soit propagée
+      await new Promise(resolve => setTimeout(resolve, 300))
+      
+      // Vérifier qu'il ne reste plus de scans pour ce contrôleur dans la dernière heure
+      const { count: remainingScans, error: verifyError } = await supabase
+        .from('scan_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('controller_id', controller.id)
+        .in('student_id', studentIds)
+        .gte('scanned_at', oneHourAgo)
+      
+      if (verifyError) {
+        logger.warn('Erreur vérification suppression scans (non bloquant)', verifyError)
+      } else if (remainingScans > 0) {
+        logger.warn(`Il reste ${remainingScans} scan(s) après la suppression. Cela peut indiquer un problème de propagation.`)
+        // Attendre encore un peu plus
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
       // Logger dans activity_logs pour traçabilité
+      // IMPORTANT : Les contrôleurs n'ont pas de user_id (pas dans profiles), 
+      // donc on doit insérer directement dans activity_logs avec entity_id = controller.id
       try {
+        // Utiliser logActivity si possible, sinon insérer directement
+        // Mais comme les contrôleurs n'ont pas de user_id, on insère directement
         const { error: activityError } = await supabase.from('activity_logs').insert([
           {
-            action: 'reset_scans_hour',
+            action: ACTIONS.RESET_SCANS_HOUR,
             entity_type: 'controller',
             entity_id: controller.id,
+            user_id: null, // Les contrôleurs n'ont pas de user_id
             details: {
               controller_id: controller.id,
               controller_name: controller.name,
@@ -648,28 +688,67 @@ export default function ControllerScanner() {
               ligne_id: controller.line_id,
               ligne_name: controller.line_name,
               scans_deleted: scansCount || 0,
+              remaining_scans_after_deletion: remainingScans || 0,
               student_count: studentIds.length,
               reset_scope: 'controller_line_only', // Réinitialisation uniquement pour ce contrôleur et sa ligne
+              reset_timestamp: new Date().toISOString(),
             },
           },
         ])
 
         if (activityError) {
-          logger.debug('Error logging reset scans activity', activityError)
-          // Non bloquant
+          logger.error('Erreur logging reset scans activity dans activity_logs', activityError)
+          // Essayer de logger dans les logs console au moins pour la traçabilité
+          logger.info('Réinitialisation scans (activity_logs indisponible)', {
+            action: ACTIONS.RESET_SCANS_HOUR,
+            controller_id: controller.id,
+            controller_name: controller.name,
+            controller_code: controller.code,
+            ligne_id: controller.line_id,
+            ligne_name: controller.line_name,
+            scans_deleted: scansCount || 0,
+            remaining_scans_after_deletion: remainingScans || 0,
+            student_count: studentIds.length,
+            reset_scope: 'controller_line_only',
+            timestamp: new Date().toISOString(),
+          })
+        } else {
+          logger.info('Réinitialisation scans loggée avec succès dans activity_logs', {
+            controller_id: controller.id,
+            scans_deleted: scansCount || 0,
+            remaining_scans: remainingScans || 0,
+          })
         }
       } catch (logError) {
-        logger.debug('Error logging reset scans activity', logError)
-        // Non bloquant
+        logger.error('Erreur logging reset scans activity', logError)
+        // Logger au moins dans les logs console pour la traçabilité
+        logger.info('Réinitialisation scans (erreur activity_logs)', {
+          action: ACTIONS.RESET_SCANS_HOUR,
+          controller_id: controller.id,
+          controller_name: controller.name,
+          controller_code: controller.code,
+          ligne_id: controller.line_id,
+          ligne_name: controller.line_name,
+          scans_deleted: scansCount || 0,
+          remaining_scans_after_deletion: remainingScans || 0,
+          student_count: studentIds.length,
+          reset_scope: 'controller_line_only',
+          timestamp: new Date().toISOString(),
+          error: logError.message,
+        })
       }
 
-      toast.success(`Vos scans de la dernière heure pour votre ligne ont été réinitialisés. ${scansCount || 0} scan(s) supprimé(s).\n\n✅ Vous pouvez maintenant rescanner immédiatement tous les étudiants de votre ligne sans qu'ils soient marqués comme doublons.`, {
+      // Message de succès avec plus de détails
+      const successMessage = `Vos scans de la dernière heure pour votre ligne ont été réinitialisés.\n\n✅ ${scansCount || 0} scan(s) supprimé(s)\n✅ Vous pouvez maintenant rescanner immédiatement tous les étudiants de votre ligne sans qu'ils soient marqués comme doublons.${remainingScans > 0 ? `\n⚠️ Attention: ${remainingScans} scan(s) restant(s). Si le problème persiste, attendez quelques secondes.` : ''}`
+      
+      toast.success(successMessage, {
         duration: 6000
       })
       
-      // IMPORTANT : Forcer une petite pause pour s'assurer que la suppression est bien propagée dans la DB
-      // avant de permettre un nouveau scan (évite les problèmes de cache/réplication)
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // IMPORTANT : Forcer une pause plus longue pour s'assurer que la suppression est bien propagée dans la DB
+      // et que le cache est invalidé (évite les problèmes de cache/réplication)
+      // Attendre 1 seconde supplémentaire pour garantir la propagation
+      await new Promise(resolve => setTimeout(resolve, 1000))
       
       logger.info('Réinitialisation scans contrôleur (dernière heure)', {
         controller_id: controller.id,
