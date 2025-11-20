@@ -294,7 +294,7 @@ export default function ControllerScanner() {
         last_reset_timestamp: lastResetTimestampRef.current,
         recent_scans_count: recentScans?.length || 0,
         has_recent_scans: recentScans && recentScans.length > 0,
-        query_timestamp,
+        query_timestamp: queryTimestamp,
       })
 
       // Si aucun scan récent trouvé (length === 0 ou null), cela signifie :
