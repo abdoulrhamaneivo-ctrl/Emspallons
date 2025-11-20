@@ -31,8 +31,50 @@ export default function ControllerScanner() {
   const html5QrCodeRef = useRef(null)
   const scannerRef = useRef(null)
   const controllerRef = useRef(null)
-  // Timestamp de la dernière réinitialisation pour forcer une requête fraîche
-  const lastResetTimestampRef = useRef(null)
+  
+  // IMPORTANT : Stocker le timestamp de réinitialisation dans sessionStorage pour persister
+  // même si le composant se recharge. Clé unique par contrôleur pour éviter les conflits.
+  const RESET_TIMESTAMP_KEY = 'controller_reset_timestamp'
+  
+  const getLastResetTimestamp = () => {
+    if (!controller?.id) return null
+    try {
+      const stored = sessionStorage.getItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`)
+      if (stored) {
+        const timestamp = parseInt(stored, 10)
+        // Vérifier que le timestamp n'est pas trop vieux (plus de 10 secondes, on l'ignore)
+        const timeSinceReset = Date.now() - timestamp
+        if (timeSinceReset < 10000) {
+          return timestamp
+        } else {
+          // Nettoyer si trop vieux
+          sessionStorage.removeItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`)
+          return null
+        }
+      }
+    } catch (e) {
+      logger.debug('Error reading reset timestamp from sessionStorage', e)
+    }
+    return null
+  }
+  
+  const setLastResetTimestamp = (timestamp) => {
+    if (!controller?.id) return
+    try {
+      sessionStorage.setItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`, timestamp.toString())
+    } catch (e) {
+      logger.debug('Error saving reset timestamp to sessionStorage', e)
+    }
+  }
+  
+  const clearLastResetTimestamp = () => {
+    if (!controller?.id) return
+    try {
+      sessionStorage.removeItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`)
+    } catch (e) {
+      logger.debug('Error clearing reset timestamp from sessionStorage', e)
+    }
+  }
 
   // Vérifier si un contrôleur est déjà connecté
   useEffect(() => {
@@ -82,6 +124,91 @@ export default function ControllerScanner() {
   useEffect(() => {
     controllerRef.current = controller
   }, [controller])
+
+  // IMPORTANT : Vérifier et rafraîchir automatiquement la session contrôleur
+  // Pour éviter que la session devienne invalide sans que l'utilisateur le sache
+  useEffect(() => {
+    if (!controller?.id) return
+
+    const validateAndRefreshSession = async () => {
+      try {
+        // Vérifier que le contrôleur est toujours actif et que la ligne existe toujours
+        const { data: controllerData, error } = await supabase
+          .from('controllers')
+          .select(`
+            id,
+            nom,
+            code,
+            active,
+            ligne_id,
+            lines:ligne_id (
+              id,
+              nom,
+              couleur
+            )
+          `)
+          .eq('id', controller.id)
+          .eq('active', true)
+          .maybeSingle()
+
+        if (error) {
+          logger.warn('Error validating controller session', error)
+          return
+        }
+
+        // Si le contrôleur n'existe plus ou n'est plus actif, déconnecter
+        if (!controllerData || !controllerData.active) {
+          logger.warn('Controller session invalid - controller no longer active', {
+            controller_id: controller.id,
+          })
+          sessionStorage.removeItem('controller_session')
+          window.dispatchEvent(new CustomEvent('controller-session-changed', {
+            detail: { controller: null }
+          }))
+          setController(null)
+          toast.error('Votre session a expiré. Veuillez vous reconnecter.')
+          return
+        }
+
+        // Si la ligne a changé ou n'existe plus, mettre à jour les données
+        if (controllerData.ligne_id !== controller.line_id || !controllerData.lines) {
+          logger.info('Controller line changed, updating session', {
+            old_line_id: controller.line_id,
+            new_line_id: controllerData.ligne_id,
+          })
+          
+          const updatedController = {
+            id: controllerData.id,
+            name: controllerData.nom,
+            code: controllerData.code,
+            line_id: controllerData.ligne_id,
+            line_name: controllerData.lines?.nom || 'Sans ligne',
+            line_color: controllerData.lines?.couleur || null,
+          }
+
+          // Mettre à jour la session
+          sessionStorage.setItem('controller_session', JSON.stringify({
+            controller_session: updatedController,
+          }))
+          setController(updatedController)
+          controllerRef.current = updatedController
+        }
+      } catch (error) {
+        logger.error('Error validating controller session', error)
+        // En cas d'erreur réseau, ne pas déconnecter (peut être temporaire)
+      }
+    }
+
+    // Valider immédiatement après le chargement
+    validateAndRefreshSession()
+
+    // Valider périodiquement (toutes les 5 minutes)
+    const intervalId = setInterval(validateAndRefreshSession, 5 * 60 * 1000)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [controller?.id, controller?.line_id])
 
   // Vibration helper
   const vibrate = (pattern) => {
@@ -239,23 +366,26 @@ export default function ControllerScanner() {
       // donc cette vérification trouvera 0 scans et le nouveau scan sera accepté sans être marqué comme doublon
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
       
-      // IMPORTANT : Si une réinitialisation vient d'avoir lieu (dans les 5 dernières secondes),
+      // IMPORTANT : Si une réinitialisation vient d'avoir lieu (dans les 10 dernières secondes),
       // ajuster la date de recherche pour ignorer les scans supprimés par la réinitialisation
       // Cela garantit que même si le cache n'est pas invalidé, on ne trouve pas les scans supprimés
+      // Le timestamp est maintenant stocké dans sessionStorage pour persister même si le composant se recharge
       let effectiveOneHourAgo = oneHourAgo
-      if (lastResetTimestampRef.current) {
-        const timeSinceReset = Date.now() - lastResetTimestampRef.current
+      const lastResetTimestamp = getLastResetTimestamp()
+      if (lastResetTimestamp) {
+        const timeSinceReset = Date.now() - lastResetTimestamp
         // Si la réinitialisation a eu lieu dans les 10 dernières secondes, utiliser le timestamp de réinitialisation
         // comme date minimale pour ignorer les scans supprimés
         if (timeSinceReset < 10000) {
-          effectiveOneHourAgo = new Date(lastResetTimestampRef.current).toISOString()
+          effectiveOneHourAgo = new Date(lastResetTimestamp).toISOString()
           logger.debug('Utilisation timestamp de réinitialisation pour ignorer les scans supprimés', {
-            reset_timestamp: lastResetTimestampRef.current,
+            reset_timestamp: lastResetTimestamp,
             effective_one_hour_ago: effectiveOneHourAgo,
+            time_since_reset: timeSinceReset,
           })
         } else {
-          // Plus de 10 secondes depuis la réinitialisation, réinitialiser la référence
-          lastResetTimestampRef.current = null
+          // Plus de 10 secondes depuis la réinitialisation, nettoyer
+          clearLastResetTimestamp()
         }
       }
       
@@ -291,7 +421,7 @@ export default function ControllerScanner() {
         controller_id: controller.id,
         one_hour_ago: oneHourAgo,
         effective_one_hour_ago: effectiveOneHourAgo,
-        last_reset_timestamp: lastResetTimestampRef.current,
+        last_reset_timestamp: getLastResetTimestamp(),
         recent_scans_count: recentScans?.length || 0,
         has_recent_scans: recentScans && recentScans.length > 0,
         query_timestamp: queryTimestamp,
@@ -849,14 +979,17 @@ export default function ControllerScanner() {
         duration: 6000
       })
       
-      // IMPORTANT : Enregistrer le timestamp de la réinitialisation
+      // IMPORTANT : Enregistrer le timestamp de la réinitialisation dans sessionStorage
       // Cela permettra aux prochaines vérifications de doublons d'ignorer les scans supprimés
       // même si le cache n'est pas immédiatement invalidé
-      lastResetTimestampRef.current = Date.now()
+      // Stockage dans sessionStorage pour persister même si le composant se recharge
+      const resetTimestamp = Date.now()
+      setLastResetTimestamp(resetTimestamp)
       
-      logger.info('Timestamp de réinitialisation enregistré', {
-        timestamp: lastResetTimestampRef.current,
+      logger.info('Timestamp de réinitialisation enregistré dans sessionStorage', {
+        timestamp: resetTimestamp,
         controller_id: controller.id,
+        storage_key: `${RESET_TIMESTAMP_KEY}_${controller.id}`,
       })
       
       // IMPORTANT : Forcer une pause pour s'assurer que la suppression est bien propagée dans la DB
