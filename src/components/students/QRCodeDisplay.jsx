@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { X, Download, Printer, RotateCcw, Ban, MessageCircle, Send } from 'lucide-react'
 import { Button } from '../ui'
@@ -14,20 +14,19 @@ export default function QRCodeDisplay({ student, onClose, onRegenerate }) {
   const [loading, setLoading] = useState(false)
   const qrRef = useRef(null)
 
-  // Générer le token JSON sécurisé
-  const generateQRData = () => {
-    if (!student.qr_code_token) return null
+  // IMPORTANT : Mémoriser le qrData pour éviter la régénération à chaque render
+  // Le QR code ne sera recalculé que si student.qr_code_token, student.id ou student.created_at change
+  const qrData = useMemo(() => {
+    if (!student?.qr_code_token) return null
 
-    const qrData = {
+    const qrDataObj = {
       studentId: student.id,
       token: student.qr_code_token,
       generatedAt: student.created_at || new Date().toISOString(),
     }
 
-    return JSON.stringify(qrData)
-  }
-
-  const qrData = generateQRData()
+    return JSON.stringify(qrDataObj)
+  }, [student?.qr_code_token, student?.id, student?.created_at])
 
   const handleDownload = () => {
     if (!qrRef.current) return
