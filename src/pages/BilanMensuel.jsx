@@ -375,27 +375,7 @@ export default function BilanMensuel() {
 
     try {
       const wb = XLSX.utils.book_new()
-      const resumeData = [
-        ['BILAN MENSUEL - EMSP TRANSPORT CAR SCOLAIRE'],
-        [],
-        ['Mois', moisLisible],
-        ['Date d’édition', format(new Date(), 'dd/MM/yyyy', { locale: fr })],
-        [],
-        ['Finances'],
-        ['Total encaissé', bilanData.stats.totalEncaisse],
-        ['Nombre de paiements', bilanData.stats.nombrePaiements],
-        ['Montant moyen', Math.round(bilanData.stats.montantMoyen)],
-        [],
-        ['Étudiants'],
-        ['Total étudiants', bilanData.stats.totalEtudiants || 0],
-        ['Étudiants actifs', bilanData.stats.etudiantsActifs],
-        ['Revenu théorique', bilanData.stats.revenuTheorique],
-        ['Taux de recouvrement', `${bilanData.stats.tauxRecouvrement}% (${bilanData.stats.totalEncaisse.toLocaleString('fr-FR')} / ${bilanData.stats.revenuTheorique.toLocaleString('fr-FR')} FCFA)`],
-      ]
-
-      const ws1 = XLSX.utils.aoa_to_sheet(resumeData)
-      XLSX.utils.book_append_sheet(wb, ws1, 'Résumé')
-
+      
       // Récupérer les mois hors service pour l'export
       let pausedMonths = []
       try {
@@ -417,91 +397,246 @@ export default function BilanMensuel() {
         return (sessions || []).filter(session => !pausedMonths.includes(session))
       }
 
+      // ============================================
+      // FEUILLE 1: RÉSUMÉ GÉNÉRAL
+      // ============================================
+      const resumeData = [
+        ['BILAN MENSUEL - EMSP TRANSPORT CAR SCOLAIRE'],
+        [],
+        ['Mois', moisLisible],
+        ['Date d\'édition', format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr })],
+        [],
+        ['FINANCES'],
+        ['Total encaissé ce mois', `${bilanData.stats.totalEncaisse.toLocaleString('fr-FR')} FCFA`],
+        ['Nombre de paiements', bilanData.stats.nombrePaiements],
+        ['Montant moyen par paiement', `${Math.round(bilanData.stats.montantMoyen).toLocaleString('fr-FR')} FCFA`],
+        ['Paiements normaux', bilanData.stats.paiementsNormaux],
+        ['Paiements anticipés', bilanData.stats.paiementsAnticipes],
+        ['Paiements en retard', bilanData.stats.paiementsRetard],
+        [],
+        ['ÉTUDIANTS'],
+        ['Total étudiants', bilanData.stats.totalEtudiants || 0],
+        ['Étudiants actifs', bilanData.stats.etudiantsActifs],
+        ['Étudiants en retard', bilanData.stats.parStatut?.EN_RETARD || 0],
+        ['Étudiants expirés', bilanData.stats.parStatut?.EXPIRE || 0],
+        ['Étudiants hors service', bilanData.stats.parStatut?.HORS_SERVICE || 0],
+        [],
+        ['REVENUS'],
+        ['Revenu théorique', `${bilanData.stats.revenuTheorique.toLocaleString('fr-FR')} FCFA`],
+        ['Taux de recouvrement', `${bilanData.stats.tauxRecouvrement}%`],
+        ['Détail', `${bilanData.stats.totalEncaisse.toLocaleString('fr-FR')} / ${bilanData.stats.revenuTheorique.toLocaleString('fr-FR')} FCFA`],
+      ]
+
+      const ws1 = XLSX.utils.aoa_to_sheet(resumeData)
+      ws1['!cols'] = [{ wch: 30 }, { wch: 25 }]
+      XLSX.utils.book_append_sheet(wb, ws1, 'Résumé')
+
+      // ============================================
+      // FEUILLE 2: DÉTAIL DES PAIEMENTS (avec info anticipés)
+      // ============================================
       const paymentsData = bilanData.payments.map((payment) => {
         const allSessions = payment.sessions || []
-        // Filtrer pour ne garder que les mois valides (hors service exclus)
         const validSessions = filterValidSessions(allSessions)
         const currentMonth = selectedMonth
-        let moisCouverts = '-'
         
-        // Si le paiement couvre plusieurs mois, montrer le format "1/5" basé sur les mois valides
-        if (validSessions.length > 1) {
-          const monthIndex = validSessions.indexOf(currentMonth)
-          if (monthIndex !== -1) {
-            // Format "1/5" pour ce mois dans le bilan (basé sur les mois valides uniquement)
-            moisCouverts = `${monthIndex + 1}/${validSessions.length} (${validSessions.join(', ')})`
-          } else {
-            // Ce mois n'est pas dans ce paiement
-            moisCouverts = `0/${validSessions.length} (${validSessions.join(', ')})`
-          }
-        } else if (validSessions.length === 1) {
-          moisCouverts = validSessions[0]
-        }
+        // Déterminer si c'est un paiement anticipé
+        const futureSessions = validSessions.filter(s => s > currentMonth)
+        const isAnticipated = futureSessions.length > 0
+        const isCurrentMonth = validSessions.includes(currentMonth)
+        
+        // Mois couverts
+        let moisCouverts = validSessions.length > 0 ? validSessions.join(', ') : '-'
+        
+        // Position dans le paiement multi-mois
+        const monthIndex = validSessions.indexOf(currentMonth)
+        const positionPaiement = monthIndex !== -1 
+          ? `${monthIndex + 1}/${validSessions.length}`
+          : validSessions.length > 1 ? `0/${validSessions.length}` : '1/1'
+        
+        // Montant pour ce mois uniquement (réparti sur les mois valides)
+        const montantCeMois = validSessions.length > 0 && isCurrentMonth
+          ? Math.round((payment.montant_total || 0) / validSessions.length)
+          : 0
+        
+        // Mois anticipés (futurs mais payés d'avance)
+        const moisAnticipes = futureSessions.length > 0 ? futureSessions.join(', ') : '-'
         
         return {
           Date: format(new Date(payment.created_at), 'dd/MM/yyyy'),
           Référence: generateReference(payment.id, payment.created_at),
           Étudiant: `${payment.student?.nom || ''} ${payment.student?.prenom || ''}`.trim(),
+          'Contact': payment.student?.contact || '-',
           'Ligne de car': payment.student?.lines?.nom || '-',
-          'Mois couverts (hors service exclus)': moisCouverts,
-          'Position dans paiement': validSessions.length > 1 && validSessions.indexOf(currentMonth) !== -1 
-            ? `${validSessions.indexOf(currentMonth) + 1}/${validSessions.length}`
-            : validSessions.length > 1 ? `0/${validSessions.length}` : '1/1',
-          'Nombre total de mois (valides)': validSessions.length || 0,
+          'Classe': payment.student?.classe || '-',
+          'Niveau': payment.student?.niveau || '-',
+          'Type paiement': isAnticipated ? 'Anticipé' : (validSessions.length > 0 && validSessions.every(s => s <= currentMonth) && validSessions.length > 1 ? 'Retard' : 'Normal'),
+          'Nombre de mois payés': validSessions.length || 0,
+          'Mois couverts (tous)': moisCouverts,
+          'Mois en cours': isCurrentMonth ? 'Oui' : 'Non',
+          'Position mois en cours': positionPaiement,
+          'Mois anticipés (payés mais futurs)': moisAnticipes,
           'Montant total (FCFA)': payment.montant_total || 0,
-          'Montant ce mois (FCFA)': validSessions.length > 0 && validSessions.includes(currentMonth)
-            ? Math.round((payment.montant_total || 0) / validSessions.length)
-            : 0,
+          'Montant mensuel moyen (FCFA)': validSessions.length > 0 ? Math.round((payment.montant_total || 0) / validSessions.length) : 0,
+          'Montant comptabilisé ce mois (FCFA)': montantCeMois,
+          'Note': isAnticipated 
+            ? `Paiement anticipé: ${futureSessions.length} mois futur(s) déjà payés mais comptabilisés seulement pour ce mois`
+            : validSessions.length > 1 && isCurrentMonth
+            ? `Paiement multi-mois: seuls ${montantCeMois.toLocaleString('fr-FR')} FCFA comptabilisés pour ce mois`
+            : '-',
         }
       })
 
+      // Trier par ligne puis par date
+      paymentsData.sort((a, b) => {
+        const ligneCompare = (a['Ligne de car'] || '').localeCompare(b['Ligne de car'] || '')
+        if (ligneCompare !== 0) return ligneCompare
+        return new Date(a.Date.split('/').reverse().join('-')) - new Date(b.Date.split('/').reverse().join('-'))
+      })
+
       const ws2 = XLSX.utils.json_to_sheet(paymentsData)
-      XLSX.utils.book_append_sheet(wb, ws2, 'Paiements')
+      ws2['!cols'] = [
+        { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, 
+        { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 6 }, { wch: 30 },
+        { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 15 },
+        { wch: 25 }, { wch: 60 }
+      ]
+      XLSX.utils.book_append_sheet(wb, ws2, 'Paiements détaillés')
 
-      const studentsData = bilanData.students.map((student) => ({
-        Nom: student.nom,
-        Prénom: student.prenom || '',
-        Classe: student.classe || '-',
-        Niveau: student.niveau || '-',
-        'Ligne de car': student.lines?.nom || '-',
-        'Mois payés': student.months_ledger?.length || 0,
-        'Dernier mois': student.months_ledger?.[student.months_ledger.length - 1] || '-',
-        Statut: student.statut_paiement || '-',
-      }))
-      const ws3 = XLSX.utils.json_to_sheet(studentsData)
-      XLSX.utils.book_append_sheet(wb, ws3, 'Étudiants actifs')
+      // ============================================
+      // FEUILLE 3: ÉTUDIANTS PAR LIGNE (Classement par ligne)
+      // ============================================
+      // Grouper les étudiants par ligne
+      const studentsByLine = {}
+      bilanData.students.forEach((student) => {
+        const lineName = student.lines?.nom || 'Sans ligne'
+        if (!studentsByLine[lineName]) {
+          studentsByLine[lineName] = []
+        }
+        studentsByLine[lineName].push(student)
+      })
 
-      // Feuille 4 : Analyse par ligne de car (uniquement si toutes les lignes)
+      // Créer une feuille par ligne avec tous les étudiants de cette ligne
+      Object.keys(studentsByLine)
+        .sort()
+        .forEach((lineName) => {
+          const studentsData = studentsByLine[lineName].map((student) => {
+            const validSessions = filterValidSessions(student.months_ledger || [])
+            const futureSessions = validSessions.filter(s => s > selectedMonth)
+            const hasAnticipated = futureSessions.length > 0
+            const isCurrentMonthPaid = validSessions.includes(selectedMonth)
+            
+            return {
+              Nom: student.nom,
+              Prénom: student.prenom || '',
+              Contact: student.contact || '-',
+              Classe: student.classe || '-',
+              Niveau: student.niveau || '-',
+              'Point de ramassage': student.point_ramassage || '-',
+              'Statut ce mois': student.statutPourMois || student.statut_paiement || '-',
+              'Total mois payés': validSessions.length || 0,
+              'Mois payés (liste)': validSessions.length > 0 ? validSessions.join(', ') : 'Aucun',
+              'Mois en cours payé': isCurrentMonthPaid ? 'Oui' : 'Non',
+              'Paiement anticipé': hasAnticipated ? 'Oui' : 'Non',
+              'Mois anticipés': futureSessions.length > 0 ? futureSessions.join(', ') : '-',
+              'Dernier mois payé': validSessions.length > 0 ? validSessions[validSessions.length - 1] : '-',
+            }
+          })
+
+          // Trier par nom
+          studentsData.sort((a, b) => {
+            const nomCompare = (a.Nom || '').localeCompare(b.Nom || '')
+            if (nomCompare !== 0) return nomCompare
+            return (a.Prénom || '').localeCompare(b.Prénom || '')
+          })
+
+          const ws = XLSX.utils.json_to_sheet(studentsData)
+          ws['!cols'] = [
+            { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 },
+            { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 40 }, { wch: 15 },
+            { wch: 15 }, { wch: 25 }, { wch: 15 }
+          ]
+          // Nom de la feuille limité à 31 caractères
+          const sheetName = lineName.length > 31 ? lineName.substring(0, 28) + '...' : lineName
+          XLSX.utils.book_append_sheet(wb, ws, sheetName)
+        })
+
+      // ============================================
+      // FEUILLE D'ANALYSE PAR LIGNE (Résumé)
+      // ============================================
       if (selectedLigne === 'all' && bilanData.stats.classementAbonnes.length > 0) {
         const lignesData = bilanData.stats.classementAbonnes.map((ligne, index) => ({
           Rang: index + 1,
           'Ligne de car': ligne.nom,
           'Nombre d\'abonnés': ligne.abonnes,
-          'Montant total payé (FCFA)': ligne.montantTotal,
+          'Montant total payé ce mois (FCFA)': ligne.montantTotal,
           'Nombre de paiements': ligne.nombrePaiements,
-          'Montant moyen (FCFA)': Math.round(ligne.montantMoyen),
+          'Montant moyen par paiement (FCFA)': Math.round(ligne.montantMoyen),
           'Revenu théorique (FCFA)': ligne.revenuTheorique,
-          'Taux de recouvrement (%)': ligne.tauxRecouvrement,
+          'Taux de recouvrement (%)': `${ligne.tauxRecouvrement}%`,
+          'Détail': `${ligne.montantTotal.toLocaleString('fr-FR')} / ${ligne.revenuTheorique.toLocaleString('fr-FR')} FCFA`,
         }))
         
-        const ws4 = XLSX.utils.json_to_sheet(lignesData)
-        ws4['!cols'] = [
-          { wch: 8 }, { wch: 20 }, { wch: 18 }, { wch: 25 },
-          { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 20 }
+        const wsAnalyse = XLSX.utils.json_to_sheet(lignesData)
+        wsAnalyse['!cols'] = [
+          { wch: 8 }, { wch: 25 }, { wch: 18 }, { wch: 30 },
+          { wch: 20 }, { wch: 30 }, { wch: 30 }, { wch: 20 }, { wch: 40 }
         ]
-        XLSX.utils.book_append_sheet(wb, ws4, 'Analyse par ligne')
+        XLSX.utils.book_append_sheet(wb, wsAnalyse, 'Analyse par ligne')
+      }
+
+      // ============================================
+      // FEUILLE: PAIEMENTS ANTICIPÉS (Détail)
+      // ============================================
+      const paiementsAnticipesData = bilanData.payments
+        .filter((payment) => {
+          const validSessions = filterValidSessions(payment.sessions || [])
+          const futureSessions = validSessions.filter(s => s > selectedMonth)
+          return futureSessions.length > 0
+        })
+        .map((payment) => {
+          const validSessions = filterValidSessions(payment.sessions || [])
+          const futureSessions = validSessions.filter(s => s > selectedMonth)
+          const montantCeMois = validSessions.length > 0 && validSessions.includes(selectedMonth)
+            ? Math.round((payment.montant_total || 0) / validSessions.length)
+            : 0
+          
+          return {
+            Date: format(new Date(payment.created_at), 'dd/MM/yyyy'),
+            Référence: generateReference(payment.id, payment.created_at),
+            Étudiant: `${payment.student?.nom || ''} ${payment.student?.prenom || ''}`.trim(),
+            'Ligne de car': payment.student?.lines?.nom || '-',
+            'Montant total payé (FCFA)': payment.montant_total || 0,
+            'Nombre de mois payés': validSessions.length || 0,
+            'Mois couverts (tous)': validSessions.join(', '),
+            'Mois en cours': validSessions.includes(selectedMonth) ? 'Oui' : 'Non',
+            'Mois anticipés (futurs)': futureSessions.join(', '),
+            'Nombre de mois anticipés': futureSessions.length,
+            'Montant comptabilisé ce mois (FCFA)': montantCeMois,
+            'Montant anticipé (déjà payé mais non comptabilisé) (FCFA)': Math.round((payment.montant_total || 0) / validSessions.length) * futureSessions.length,
+            'Note': `Paiement anticipé: ${futureSessions.length} mois futur(s) déjà payés (${futureSessions.join(', ')}) mais comptabilisés seulement pour le mois en cours`,
+          }
+        })
+
+      if (paiementsAnticipesData.length > 0) {
+        const wsAnticipés = XLSX.utils.json_to_sheet(paiementsAnticipesData)
+        wsAnticipés['!cols'] = [
+          { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 20 }, { wch: 25 },
+          { wch: 15 }, { wch: 40 }, { wch: 12 }, { wch: 40 }, { wch: 18 },
+          { wch: 30 }, { wch: 35 }, { wch: 80 }
+        ]
+        XLSX.utils.book_append_sheet(wb, wsAnticipés, 'Paiements anticipés')
       }
 
       const filename = selectedLigne === 'all' 
-        ? `Bilan-${selectedMonth}.xlsx`
-        : `Bilan-${selectedMonth}-${lignes.find(l => l.id === selectedLigne)?.nom || 'ligne'}.xlsx`
+        ? `Bilan-Mensuel-${selectedMonth}.xlsx`
+        : `Bilan-Mensuel-${selectedMonth}-${lignes.find(l => l.id === selectedLigne)?.nom || 'ligne'}.xlsx`
       
       XLSX.writeFile(wb, filename)
-      toast.success('Bilan exporté avec succès')
-      logger.info('Bilan mensuel exporté', { month: selectedMonth })
+      toast.success('Bilan exporté avec succès en Excel')
+      logger.info('Bilan mensuel exporté', { month: selectedMonth, lignes: Object.keys(studentsByLine).length })
     } catch (error) {
       logger.error('Erreur export bilan mensuel', error)
-      toast.error('Erreur lors de l’export Excel')
+      toast.error('Erreur lors de l\'export Excel')
     }
   }
 
