@@ -913,17 +913,37 @@ export default function ControllerScanner() {
       // Cela permet à ce contrôleur de rescanner immédiatement tous les étudiants de SA LIGNE
       // Les autres contrôleurs ne sont pas affectés
       // Les étudiants d'autres lignes ne sont pas affectés
-      const { error } = await supabase
+      
+      // IMPORTANT : Utiliser .delete() avec les filtres pour permettre la suppression via RLS
+      // La policy RLS "Controllers can delete their own scans" doit permettre cette opération
+      const { data: deletedData, error } = await supabase
         .from('scan_logs')
         .delete()
         .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
         .in('student_id', studentIds) // Uniquement les étudiants de SA LIGNE
         .gte('scanned_at', oneHourAgo) // Dans la dernière heure
+        .select() // Sélectionner les lignes supprimées pour vérifier
 
       if (error) {
-        logger.error('Erreur réinitialisation scans ligne', error)
+        logger.error('Erreur réinitialisation scans ligne', error, {
+          controller_id: controller.id,
+          student_ids_count: studentIds.length,
+          one_hour_ago: oneHourAgo,
+          error_code: error.code,
+          error_message: error.message,
+          error_details: error.details,
+        })
         throw error
       }
+      
+      // Logger le nombre de scans réellement supprimés
+      const actualDeletedCount = deletedData?.length || 0
+      logger.info('Scans supprimés avec succès', {
+        controller_id: controller.id,
+        expected_count: scansCount || 0,
+        actual_deleted_count: actualDeletedCount,
+        student_ids_count: studentIds.length,
+      })
 
       // VÉRIFIER que la suppression a bien réussi
       // Attendre un peu pour que la suppression soit propagée

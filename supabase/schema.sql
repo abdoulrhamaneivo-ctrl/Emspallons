@@ -535,6 +535,19 @@ CREATE POLICY "Authenticated users can view scan logs"
     )
   );
 
+-- IMPORTANT : Permettre aux contrôleurs de supprimer leurs propres scans
+-- Vérifie que le controller_id existe dans la table controllers et est actif
+-- Cela permet la réinitialisation des scans sans authentification Supabase complète
+CREATE POLICY "Controllers can delete their own scans"
+  ON scan_logs FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM controllers
+      WHERE controllers.id = scan_logs.controller_id
+      AND controllers.active = true
+    )
+  );
+
 -- ============================================
 -- POLICIES - SETTINGS
 -- ============================================
