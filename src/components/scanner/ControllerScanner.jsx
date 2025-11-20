@@ -419,7 +419,7 @@ export default function ControllerScanner() {
         logger.error('Error checking duplicate scans', recentScansError)
         // Continue le processus même en cas d'erreur (ne pas bloquer le scan)
       }
-      
+
       // Logger pour traçabilité et debug
       logger.debug('Vérification doublons', {
         student_id: student.id,
@@ -681,7 +681,7 @@ export default function ControllerScanner() {
         }
       }, 3000)
     }
-  }, [controller, scanning, handleScan])
+  }, [controller, scanning])
 
   const initializeScanner = useCallback(async () => {
     if (!controller || !scanning) return
@@ -765,7 +765,7 @@ export default function ControllerScanner() {
           
           // Traiter le scan IMMÉDIATEMENT
           try {
-            await handleScan(decodedText)
+          await handleScan(decodedText)
             logger.info('handleScan terminé avec succès, résultat devrait être affiché')
             
             // IMPORTANT : Maintenant qu'on a traité le scan et défini le résultat,
@@ -958,12 +958,12 @@ export default function ControllerScanner() {
             entity_id: controller.id,
             user_id: null, // Les contrôleurs n'ont pas de user_id
             details: {
-              controller_id: controller.id,
+        controller_id: controller.id,
               controller_name: controller.name,
               controller_code: controller.code,
               ligne_id: controller.line_id,
               ligne_name: controller.line_name,
-              scans_deleted: scansCount || 0,
+        scans_deleted: scansCount || 0,
               remaining_scans_after_deletion: remainingScans || 0,
               student_count: studentIds.length,
               reset_scope: 'controller_line_only', // Réinitialisation uniquement pour ce contrôleur et sa ligne
