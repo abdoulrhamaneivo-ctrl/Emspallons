@@ -681,7 +681,7 @@ export default function ControllerScanner() {
         }
       }, 3000)
     }
-  }, [controller, scanning])
+  }, [controller, scanning, handleScan])
 
   const initializeScanner = useCallback(async () => {
     if (!controller || !scanning) return
@@ -739,7 +739,8 @@ export default function ControllerScanner() {
         { facingMode: 'environment' },
         config,
         async (decodedText) => {
-          // Arrêter temporairement le scanner pendant le traitement
+          // IMPORTANT : Ne pas arrêter le scanner ou changer scanning AVANT d'avoir traité le scan
+          // car cela peut déclencher des useEffect qui interfèrent avec l'affichage du résultat
           if (!controllerRef.current) {
             logger.warn('Scan callback called but no controller in ref', {
               hasControllerRef: !!controllerRef.current,
@@ -753,17 +754,26 @@ export default function ControllerScanner() {
             controllerId: controllerRef.current?.id,
           })
           
+          // IMPORTANT : Arrêter le scanner SANS changer l'état scanning tout de suite
+          // pour éviter que les useEffect se déclenchent et interfèrent
           try {
             await html5QrCode.stop()
-            setScanning(false)
+            // Ne pas appeler setScanning(false) ici - on le fera après avoir affiché le résultat
           } catch (e) {
             logger.debug('Error stopping scanner during scan', e)
           }
           
-          // Traiter le scan
+          // Traiter le scan IMMÉDIATEMENT
           try {
             await handleScan(decodedText)
-            logger.info('handleScan terminé avec succès')
+            logger.info('handleScan terminé avec succès, résultat devrait être affiché')
+            
+            // IMPORTANT : Maintenant qu'on a traité le scan et défini le résultat,
+            // on peut changer scanning pour permettre le redémarrage ultérieur
+            // Mais on attend un peu pour que le résultat s'affiche
+            setTimeout(() => {
+              setScanning(false)
+            }, 100)
           } catch (error) {
             logger.error('Erreur dans handleScan', error)
             // Assurer qu'un résultat d'erreur est affiché même si handleScan échoue
@@ -773,6 +783,10 @@ export default function ControllerScanner() {
               message: '❌ Erreur lors du traitement du scan. Veuillez réessayer.',
               bgColor: 'bg-red-500',
             })
+            // Attendre un peu avant de changer scanning pour que l'erreur s'affiche
+            setTimeout(() => {
+              setScanning(false)
+            }, 100)
           }
           
           // Redémarrer automatiquement le scanner après traitement
