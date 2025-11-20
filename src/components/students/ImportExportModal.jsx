@@ -6,6 +6,7 @@ import { exportStudentsToJSON, exportStudentsToCSV, exportStudentsToExcel, parse
 import toast from 'react-hot-toast'
 import { useStudents } from '../../hooks/useStudents'
 import { useAuth } from '../../context/AuthContext'
+import { logActivity, ACTIONS } from '../../lib/activityLogger'
 
 export default function ImportExportModal({ isOpen, onClose, students, lines, onImportSuccess }) {
   const [importing, setImporting] = useState(false)
@@ -79,9 +80,24 @@ export default function ImportExportModal({ isOpen, onClose, students, lines, on
           return
         }
         
+        // Vérifier les lignes manquantes avec plus de détails
         const missingLine = studentsToImport.filter(student => !student.ligne_id)
         if (missingLine.length > 0) {
-          toast.error('Certaines lignes n\'ont pas de ligne de car correspondante. Vérifiez le mapping avant de continuer.')
+          // Extraire les noms de lignes uniques qui n'ont pas été trouvées
+          const missingLineNames = [...new Set(missingLine.map(s => s.ligne_nom_original).filter(Boolean))]
+          
+          // Obtenir la liste des lignes disponibles
+          const availableLines = (lines || []).map(l => l.nom).join(', ') || 'Aucune ligne disponible'
+          
+          // Construire un message d'erreur détaillé
+          let errorMessage = `Certaines lignes n'ont pas de correspondance dans la base de données.\n\n`
+          errorMessage += `Lignes non trouvées : ${missingLineNames.join(', ')}\n\n`
+          errorMessage += `Lignes disponibles : ${availableLines}\n\n`
+          errorMessage += `Veuillez vérifier les noms de lignes dans votre fichier et les aligner avec les noms dans la base de données.`
+          
+          // Afficher l'erreur dans une alerte pour plus de visibilité
+          alert(errorMessage)
+          toast.error(`Lignes non trouvées : ${missingLineNames.join(', ')}`)
           setImporting(false)
           return
         }
@@ -92,12 +108,16 @@ export default function ImportExportModal({ isOpen, onClose, students, lines, on
 
         for (const studentData of studentsToImport) {
           try {
-            // Générer QR code
-            const qrToken = `QR-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`
+            // IMPORTANT : Toujours générer un nouveau code QR lors de l'import
+            // Même si l'étudiant avait déjà un code QR dans le fichier importé,
+            // on génère un nouveau code pour garantir l'unicité et la fraîcheur
+            
+            // Créer une copie sans le qr_code_token et ligne_nom_original (champ temporaire)
+            const { qr_code_token: _, ligne_nom_original: __, ...studentDataClean } = studentData
             
             const result = await createStudent({
-              ...studentData,
-              qr_code_token: studentData.qr_code_token || qrToken,
+              ...studentDataClean,
+              // qr_code_token sera généré automatiquement par createStudent
               qr_code_status: 'active',
               created_by: user?.id,
             }, { silent: true })
@@ -111,6 +131,26 @@ export default function ImportExportModal({ isOpen, onClose, students, lines, on
             errorCount++
             console.error('Erreur création étudiant:', error)
           }
+        }
+
+        // Logger l'import dans activity_logs pour traçabilité
+        try {
+          await logActivity({
+            action: ACTIONS.IMPORT_STUDENTS,
+            entityType: 'student',
+            entityId: null,
+            details: {
+              total_imported: studentsToImport.length,
+              success_count: successCount,
+              error_count: errorCount,
+              format: format,
+              file_name: file.name,
+            },
+            userId: user?.id,
+          })
+        } catch (logError) {
+          console.error('Erreur logging import', logError)
+          // Non bloquant
         }
 
         toast.success(`${successCount} étudiant(s) importé(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`)

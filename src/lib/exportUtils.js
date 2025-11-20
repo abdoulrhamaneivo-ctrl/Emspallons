@@ -161,6 +161,44 @@ export const parseExcelFile = async (file) => {
 }
 
 /**
+ * Normalise une chaîne pour la comparaison (supprime accents, espaces, casse)
+ */
+const normalizeString = (str) => {
+  if (!str) return ''
+  return str
+    .toLowerCase()
+    .normalize('NFD') // Décompose les caractères accentués
+    .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
+    .replace(/\s+/g, ' ') // Normalise les espaces multiples
+    .trim()
+}
+
+/**
+ * Trouve une ligne par nom avec matching flexible (insensible à la casse, espaces, accents)
+ */
+const findLineByName = (ligneNom, linesArray) => {
+  if (!ligneNom || !Array.isArray(linesArray) || linesArray.length === 0) {
+    return null
+  }
+  
+  const normalizedNom = normalizeString(ligneNom)
+  
+  // D'abord, essayer une correspondance exacte (normale)
+  let ligne = linesArray.find(l => l.nom === ligneNom)
+  if (ligne) return ligne
+  
+  // Ensuite, essayer une correspondance insensible à la casse
+  ligne = linesArray.find(l => l.nom.toLowerCase() === ligneNom.toLowerCase())
+  if (ligne) return ligne
+  
+  // Enfin, essayer une correspondance normalisée (insensible aux accents et espaces)
+  ligne = linesArray.find(l => normalizeString(l.nom) === normalizedNom)
+  if (ligne) return ligne
+  
+  return null
+}
+
+/**
  * Mappe les données importées vers le format étudiants
  */
 export const mapImportedDataToStudents = (data, lines) => {
@@ -207,8 +245,8 @@ export const mapImportedDataToStudents = (data, lines) => {
     // IMPORTANT : Ne pas inclure le qr_code_token lors de l'import
     // Un nouveau code QR sera toujours généré lors de la création de l'étudiant
     
-    // Trouver la ligne par nom
-    const ligne = linesArray.find(l => l.nom === ligneNom)
+    // Trouver la ligne par nom avec matching flexible
+    const ligne = findLineByName(ligneNom, linesArray)
     
     return {
       nom,
@@ -216,6 +254,7 @@ export const mapImportedDataToStudents = (data, lines) => {
       contact, // Contact formaté automatiquement selon le pays
       tuteur,
       ligne_id: ligne?.id || null,
+      ligne_nom_original: ligneNom, // Conserver le nom original pour les messages d'erreur
       point_ramassage: pointRamassage,
       niveau, // Utiliser niveau (nom de la colonne dans la DB après migration)
       classe,
