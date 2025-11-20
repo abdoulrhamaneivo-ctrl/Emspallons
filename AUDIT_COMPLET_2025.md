@@ -164,16 +164,20 @@
 
 ### 🔴 Critiques
 
-1. **Schema SQL vs Code**
-   - ⚠️ **CRITIQUE**: Le schema.sql montre `promotion TEXT NOT NULL` (ligne 49)
-   - ⚠️ Mais le code utilise `niveau` (après migration `rename_promotions_to_niveaux.sql`)
-   - ⚠️ Risque d'incohérence si la migration n'est pas appliquée
-   - 📍 **Fichiers**: `supabase/schema.sql` ligne 49 vs migrations
+1. ~~**Schema SQL vs Code**~~ ✅ **CORRIGÉ**
+   - ~~⚠️ **CRITIQUE**: Le schema.sql montre `promotion TEXT NOT NULL` (ligne 49)~~
+   - ~~⚠️ Mais le code utilise `niveau` (après migration `rename_promotions_to_niveaux.sql`)~~
+   - ✅ **CORRIGÉ**: Le schema.sql a été mis à jour pour utiliser `niveau` au lieu de `promotion`
+   - ✅ **CORRIGÉ**: La vue `students_view` a également été corrigée
+   - 📍 **Fichiers**: `supabase/schema.sql` (lignes 49, 582)
 
-2. **Réinitialisation des scans**
-   - ⚠️ Le timestamp de réinitialisation est stocké dans un `useRef` qui peut être perdu
-   - ⚠️ Si le composant se recharge, la réinitialisation ne fonctionne plus correctement
-   - 📍 **Fichier**: `src/components/scanner/ControllerScanner.jsx` ligne 34
+2. ~~**Réinitialisation des scans**~~ ✅ **CORRIGÉ**
+   - ~~⚠️ Le timestamp de réinitialisation est stocké dans un `useRef` qui peut être perdu~~
+   - ~~⚠️ Si le composant se recharge, la réinitialisation ne fonctionne plus correctement~~
+   - ✅ **CORRIGÉ**: Le timestamp est maintenant stocké dans `sessionStorage` avec une clé unique par contrôleur
+   - ✅ **CORRIGÉ**: Fonctions `getLastResetTimestamp()`, `setLastResetTimestamp()`, `clearLastResetTimestamp()` pour gérer la persistance
+   - ✅ **CORRIGÉ**: Le timestamp persiste même si le composant se recharge
+   - 📍 **Fichier**: `src/components/scanner/ControllerScanner.jsx` (lignes 35-77)
 
 3. **Cache Supabase**
    - ⚠️ Après suppression de scans, le cache peut retourner des résultats obsolètes
@@ -192,10 +196,14 @@
    - ⚠️ Pas de validation stricte après import
    - 📍 **Fichier**: `src/lib/exportUtils.js` ligne 211
 
-3. **Session Controller**
-   - ⚠️ Session stockée dans `sessionStorage` (perdue à la fermeture de l'onglet)
-   - ⚠️ Pas de refresh automatique de la session contrôleur
-   - 📍 **Fichier**: `src/components/scanner/ControllerScanner.jsx` ligne 40
+3. ~~**Session Controller**~~ ✅ **CORRIGÉ**
+   - ~~⚠️ Session stockée dans `sessionStorage` (perdue à la fermeture de l'onglet)~~
+   - ~~⚠️ Pas de refresh automatique de la session contrôleur~~
+   - ✅ **CORRIGÉ**: Ajout d'un `useEffect` qui valide et rafraîchit automatiquement la session toutes les 5 minutes
+   - ✅ **CORRIGÉ**: Vérification que le contrôleur est toujours actif et que la ligne existe toujours
+   - ✅ **CORRIGÉ**: Déconnexion automatique si le contrôleur n'est plus actif
+   - ✅ **CORRIGÉ**: Mise à jour automatique si la ligne du contrôleur change
+   - 📍 **Fichier**: `src/components/scanner/ControllerScanner.jsx` (lignes 128-181)
 
 ### 🟢 Mineurs
 
