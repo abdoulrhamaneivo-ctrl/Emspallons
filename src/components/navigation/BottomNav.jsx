@@ -1,13 +1,31 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Home, GraduationCap, DollarSign, BarChart3, MoreVertical } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Home, GraduationCap, DollarSign, BarChart3, MoreVertical, LogOut } from 'lucide-react'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
+import { startTransition } from 'react'
+import toast from 'react-hot-toast'
 
 export default function BottomNav() {
   const location = useLocation()
-  const { role, user } = useAuth()
+  const navigate = useNavigate()
+  const { role, user, signOut } = useAuth()
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+
+  const handleSignOut = async () => {
+    try {
+      setShowMoreMenu(false)
+      await signOut()
+      toast.success('Déconnexion réussie')
+      setTimeout(() => {
+        startTransition(() => {
+          navigate('/login')
+        })
+      }, 500)
+    } catch (error) {
+      toast.error('Erreur lors de la déconnexion')
+    }
+  }
 
   if (!user) {
     return null
@@ -142,6 +160,19 @@ export default function BottomNav() {
                       {item.label}
                     </Link>
                   ))}
+                  {/* Bouton de déconnexion pour mobile */}
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors text-left"
+                    style={{
+                      minWidth: '44px',
+                      minHeight: '44px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <LogOut size={20} />
+                    <span>Déconnexion</span>
+                  </button>
                 </div>
               </div>
             </motion.div>
