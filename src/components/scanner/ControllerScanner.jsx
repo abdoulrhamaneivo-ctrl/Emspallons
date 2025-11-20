@@ -31,6 +31,8 @@ export default function ControllerScanner() {
   const html5QrCodeRef = useRef(null)
   const scannerRef = useRef(null)
   const controllerRef = useRef(null)
+  // Timestamp de la dernière réinitialisation pour forcer une requête fraîche
+  const lastResetTimestampRef = useRef(null)
 
   // Vérifier si un contrôleur est déjà connecté
   useEffect(() => {
@@ -190,10 +192,30 @@ export default function ControllerScanner() {
       // donc cette vérification trouvera 0 scans et le nouveau scan sera accepté sans être marqué comme doublon
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
       
+      // IMPORTANT : Si une réinitialisation vient d'avoir lieu (dans les 5 dernières secondes),
+      // ajuster la date de recherche pour ignorer les scans supprimés par la réinitialisation
+      // Cela garantit que même si le cache n'est pas invalidé, on ne trouve pas les scans supprimés
+      let effectiveOneHourAgo = oneHourAgo
+      if (lastResetTimestampRef.current) {
+        const timeSinceReset = Date.now() - lastResetTimestampRef.current
+        // Si la réinitialisation a eu lieu dans les 10 dernières secondes, utiliser le timestamp de réinitialisation
+        // comme date minimale pour ignorer les scans supprimés
+        if (timeSinceReset < 10000) {
+          effectiveOneHourAgo = new Date(lastResetTimestampRef.current).toISOString()
+          logger.debug('Utilisation timestamp de réinitialisation pour ignorer les scans supprimés', {
+            reset_timestamp: lastResetTimestampRef.current,
+            effective_one_hour_ago: effectiveOneHourAgo,
+          })
+        } else {
+          // Plus de 10 secondes depuis la réinitialisation, réinitialiser la référence
+          lastResetTimestampRef.current = null
+        }
+      }
+      
       // IMPORTANT : Utiliser une requête fraîche pour garantir que les scans supprimés par réinitialisation
       // ne sont pas retournés par un cache obsolète
-      // La requête Supabase est déjà fraîche par défaut, mais on peut ajouter un petit délai
-      // si une réinitialisation vient d'avoir lieu (géré dans resetTodayScans)
+      // Ajouter un paramètre unique dans la requête pour forcer une nouvelle requête (contourne le cache)
+      const queryTimestamp = Date.now()
       const { data: recentScans, error: recentScansError } = await supabase
         .from('scan_logs')
         .select(`
@@ -207,7 +229,7 @@ export default function ControllerScanner() {
         `)
         .eq('student_id', student.id)
         .eq('controller_id', controller.id) // Seulement les scans de CE contrôleur
-        .gte('scanned_at', oneHourAgo) // Dans la dernière heure (les scans supprimés par réinitialisation ne seront plus ici)
+        .gte('scanned_at', effectiveOneHourAgo) // Utiliser effectiveOneHourAgo qui peut être ajusté après réinitialisation
         .order('scanned_at', { ascending: true }) // Ordre ascendant pour avoir le premier scan
         .limit(1)
 
@@ -221,8 +243,11 @@ export default function ControllerScanner() {
         student_id: student.id,
         controller_id: controller.id,
         one_hour_ago: oneHourAgo,
+        effective_one_hour_ago: effectiveOneHourAgo,
+        last_reset_timestamp: lastResetTimestampRef.current,
         recent_scans_count: recentScans?.length || 0,
         has_recent_scans: recentScans && recentScans.length > 0,
+        query_timestamp,
       })
 
       // Si aucun scan récent trouvé (length === 0 ou null), cela signifie :
@@ -745,10 +770,39 @@ export default function ControllerScanner() {
         duration: 6000
       })
       
-      // IMPORTANT : Forcer une pause plus longue pour s'assurer que la suppression est bien propagée dans la DB
+      // IMPORTANT : Enregistrer le timestamp de la réinitialisation
+      // Cela permettra aux prochaines vérifications de doublons d'ignorer les scans supprimés
+      // même si le cache n'est pas immédiatement invalidé
+      lastResetTimestampRef.current = Date.now()
+      
+      logger.info('Timestamp de réinitialisation enregistré', {
+        timestamp: lastResetTimestampRef.current,
+        controller_id: controller.id,
+      })
+      
+      // IMPORTANT : Forcer une pause pour s'assurer que la suppression est bien propagée dans la DB
       // et que le cache est invalidé (évite les problèmes de cache/réplication)
-      // Attendre 1 seconde supplémentaire pour garantir la propagation
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Attendre 2 secondes pour garantir la propagation complète
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Vérifier une dernière fois qu'il ne reste plus de scans
+      const { count: finalCheck, error: finalCheckError } = await supabase
+        .from('scan_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('controller_id', controller.id)
+        .in('student_id', studentIds)
+        .gte('scanned_at', oneHourAgo)
+      
+      if (!finalCheckError && finalCheck > 0) {
+        logger.warn(`Il reste encore ${finalCheck} scan(s) après 2 secondes. Le problème de cache peut persister.`)
+        toast.error(`Attention : Il reste ${finalCheck} scan(s). Attendez quelques secondes supplémentaires avant de rescanner.`, {
+          duration: 5000
+        })
+      } else {
+        logger.info('Vérification finale réussie : tous les scans ont été supprimés', {
+          remaining_scans: finalCheck || 0,
+        })
+      }
       
       logger.info('Réinitialisation scans contrôleur (dernière heure)', {
         controller_id: controller.id,
