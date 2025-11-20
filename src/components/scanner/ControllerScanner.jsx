@@ -36,10 +36,13 @@ export default function ControllerScanner() {
   // même si le composant se recharge. Clé unique par contrôleur pour éviter les conflits.
   const RESET_TIMESTAMP_KEY = 'controller_reset_timestamp'
   
+  // IMPORTANT : Utiliser controllerRef.current au lieu de controller pour éviter les problèmes
+  // de closure et s'assurer qu'on utilise toujours la valeur la plus récente
   const getLastResetTimestamp = () => {
-    if (!controller?.id) return null
+    const currentController = controllerRef.current || controller
+    if (!currentController?.id) return null
     try {
-      const stored = sessionStorage.getItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`)
+      const stored = sessionStorage.getItem(`${RESET_TIMESTAMP_KEY}_${currentController.id}`)
       if (stored) {
         const timestamp = parseInt(stored, 10)
         // Vérifier que le timestamp n'est pas trop vieux (plus de 10 secondes, on l'ignore)
@@ -48,7 +51,7 @@ export default function ControllerScanner() {
           return timestamp
         } else {
           // Nettoyer si trop vieux
-          sessionStorage.removeItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`)
+          sessionStorage.removeItem(`${RESET_TIMESTAMP_KEY}_${currentController.id}`)
           return null
         }
       }
@@ -59,18 +62,20 @@ export default function ControllerScanner() {
   }
   
   const setLastResetTimestamp = (timestamp) => {
-    if (!controller?.id) return
+    const currentController = controllerRef.current || controller
+    if (!currentController?.id) return
     try {
-      sessionStorage.setItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`, timestamp.toString())
+      sessionStorage.setItem(`${RESET_TIMESTAMP_KEY}_${currentController.id}`, timestamp.toString())
     } catch (e) {
       logger.debug('Error saving reset timestamp to sessionStorage', e)
     }
   }
   
   const clearLastResetTimestamp = () => {
-    if (!controller?.id) return
+    const currentController = controllerRef.current || controller
+    if (!currentController?.id) return
     try {
-      sessionStorage.removeItem(`${RESET_TIMESTAMP_KEY}_${controller.id}`)
+      sessionStorage.removeItem(`${RESET_TIMESTAMP_KEY}_${currentController.id}`)
     } catch (e) {
       logger.debug('Error clearing reset timestamp from sessionStorage', e)
     }
@@ -735,7 +740,18 @@ export default function ControllerScanner() {
         config,
         async (decodedText) => {
           // Arrêter temporairement le scanner pendant le traitement
-          if (!controllerRef.current) return
+          if (!controllerRef.current) {
+            logger.warn('Scan callback called but no controller in ref', {
+              hasControllerRef: !!controllerRef.current,
+              decodedText: decodedText?.substring(0, 50),
+            })
+            return
+          }
+          
+          logger.info('QR code scanné, traitement en cours', {
+            decodedText: decodedText?.substring(0, 50),
+            controllerId: controllerRef.current?.id,
+          })
           
           try {
             await html5QrCode.stop()
@@ -745,7 +761,19 @@ export default function ControllerScanner() {
           }
           
           // Traiter le scan
-          await handleScan(decodedText)
+          try {
+            await handleScan(decodedText)
+            logger.info('handleScan terminé avec succès')
+          } catch (error) {
+            logger.error('Erreur dans handleScan', error)
+            // Assurer qu'un résultat d'erreur est affiché même si handleScan échoue
+            setScanResult({
+              success: false,
+              statut: 'error',
+              message: '❌ Erreur lors du traitement du scan. Veuillez réessayer.',
+              bgColor: 'bg-red-500',
+            })
+          }
           
           // Redémarrer automatiquement le scanner après traitement
           // Le scanner sera redémarré via le timeout dans handleScan
