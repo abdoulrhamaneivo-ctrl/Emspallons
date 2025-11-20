@@ -113,13 +113,40 @@ export default function ControllerScanner() {
 
   const handleScan = useCallback(async (qrData) => {
     if (!controller || !controllerRef.current) {
-      logger.warn('Scan attempt without active controller')
+      logger.warn('Scan attempt without active controller', { 
+        hasController: !!controller,
+        hasControllerRef: !!controllerRef.current 
+      })
+      setScanResult({
+        success: false,
+        statut: 'error',
+        message: '❌ Contrôleur non connecté. Veuillez vous reconnecter.',
+        bgColor: 'bg-red-500',
+      })
+      return
+    }
+
+    // Vérifier que qrData est valide
+    if (!qrData || typeof qrData !== 'string' || qrData.trim().length === 0) {
+      logger.warn('Invalid QR data', { qrData })
+      setScanResult({
+        success: false,
+        statut: 'error',
+        message: '❌ QR Code invalide. Veuillez réessayer.',
+        bgColor: 'bg-red-500',
+      })
+      vibrate([100, 50, 100])
+      setTimeout(() => {
+        if (controllerRef.current && !scanning) {
+          setScanning(true)
+        }
+      }, 3000)
       return
     }
 
     try {
       // Décoder le QR code (peut être JSON ou token brut)
-      let qrToken = qrData
+      let qrToken = qrData.trim()
       
       // Si c'est un JSON, extraire le token
       try {
@@ -165,7 +192,27 @@ export default function ControllerScanner() {
         .eq('qr_code_status', 'active')
         .maybeSingle() // Utiliser maybeSingle pour éviter erreur si non trouvé
 
-      if (studentError || !student) {
+      if (studentError) {
+        logger.error('Error fetching student', studentError)
+        setScanResult({
+          success: false,
+          statut: 'error',
+          message: `❌ Erreur lors de la recherche de l'étudiant: ${studentError.message || 'Erreur inconnue'}`,
+          bgColor: 'bg-red-500',
+        })
+        vibrate([100, 50, 100])
+        
+        // Redémarrer le scanner après 3 secondes
+        setTimeout(() => {
+          if (controllerRef.current && !scanning) {
+            setScanning(true)
+          }
+        }, 3000)
+        return
+      }
+      
+      if (!student) {
+        logger.warn('Student not found', { qrToken: qrToken.substring(0, 20) })
         setScanResult({
           success: false,
           statut: 'error',
@@ -452,10 +499,42 @@ export default function ControllerScanner() {
       }, 5000)
     } catch (error) {
       logger.error('Scan error', error)
+      
+      // Message d'erreur plus détaillé pour aider au debug
+      let errorMessage = 'Erreur lors du traitement du scan.'
+      let errorDetails = ''
+      
+      if (error?.message) {
+        errorDetails = error.message
+      } else if (typeof error === 'string') {
+        errorDetails = error
+      } else if (error?.error?.message) {
+        errorDetails = error.error.message
+      }
+      
+      // Messages d'erreur spécifiques selon le type d'erreur
+      if (errorDetails.includes('PGRST') || errorDetails.includes('schema') || errorDetails.includes('column')) {
+        errorMessage = 'Erreur de base de données. Vérifiez la configuration.'
+      } else if (errorDetails.includes('network') || errorDetails.includes('fetch') || errorDetails.includes('connection')) {
+        errorMessage = 'Erreur de connexion. Vérifiez votre connexion internet.'
+      } else if (errorDetails.includes('permission') || errorDetails.includes('unauthorized') || errorDetails.includes('auth')) {
+        errorMessage = 'Erreur d\'autorisation. Vérifiez votre session.'
+      } else if (errorDetails) {
+        errorMessage = `Erreur: ${errorDetails.substring(0, 100)}`
+      }
+      
+      logger.error('Scan error details', {
+        error,
+        errorMessage,
+        errorDetails,
+        controller: controller?.id,
+        qrData: typeof qrData === 'string' ? qrData.substring(0, 50) : 'N/A',
+      })
+      
       setScanResult({
         success: false,
         statut: 'error',
-        message: 'Erreur lors du traitement du scan. Veuillez réessayer.',
+        message: `❌ ${errorMessage} Veuillez réessayer.`,
         bgColor: 'bg-red-500',
       })
       vibrate([100, 50, 100])
