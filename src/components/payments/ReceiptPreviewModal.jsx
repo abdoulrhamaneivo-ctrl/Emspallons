@@ -10,24 +10,13 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
   const [loading, setLoading] = useState(false)
   const lastGeneratedKey = useRef(null)
 
-  const cacheKey = payment?.id && student?.id ? `${payment.id}-${student.id}` : null
-
-  useEffect(() => {
-    if (isOpen && cacheKey) {
-      if (lastGeneratedKey.current !== cacheKey) {
-        generatePDF(cacheKey)
-      }
-    }
-
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl)
-      }
-    }
-  }, [isOpen, cacheKey, pdfUrl, generatePDF])
-
-  const generatePDF = useCallback(async (keyOverride = cacheKey) => {
-    if (!payment || !student || !keyOverride) return
+  // Définir generatePDF AVANT useEffect pour éviter les erreurs TDZ
+  const generatePDF = useCallback(async (keyOverride = null) => {
+    // Calculer cacheKey ici pour éviter dépendances circulaires
+    const currentCacheKey = payment?.id && student?.id ? `${payment.id}-${student.id}` : null
+    const cacheKeyToUse = keyOverride || currentCacheKey
+    
+    if (!payment || !student || !cacheKeyToUse) return
 
     setLoading(true)
     try {
@@ -39,14 +28,34 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
       
       setPdfBlob(blob)
       setPdfUrl(url)
-      lastGeneratedKey.current = keyOverride
+      lastGeneratedKey.current = cacheKeyToUse
     } catch (error) {
       console.error('Erreur lors de la génération du PDF:', error)
       toast.error('Erreur lors de la génération du reçu')
     } finally {
       setLoading(false)
     }
-  }, [payment, student, cacheKey])
+  }, [payment, student])
+
+  // Calculer cacheKey après generatePDF pour éviter erreurs TDZ
+  const cacheKey = payment?.id && student?.id ? `${payment.id}-${student.id}` : null
+
+  useEffect(() => {
+    if (!isOpen || !cacheKey || !payment || !student) return
+
+    // Générer le PDF seulement si la clé a changé
+    if (lastGeneratedKey.current !== cacheKey) {
+      generatePDF(cacheKey)
+    }
+
+    // Cleanup : révoquer l'URL blob lors du démontage
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, cacheKey, generatePDF])
 
   const handleDownload = async () => {
     if (!payment || !student) return

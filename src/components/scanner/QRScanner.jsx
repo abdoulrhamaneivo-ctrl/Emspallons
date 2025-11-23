@@ -72,7 +72,9 @@ export default function QRScanner({ onScanSuccess, onScanError }) {
   }
 
   const handleManualInput = (e) => {
+    // Utiliser onKeyDown au lieu de onKeyPress (onKeyPress est déprécié et ne fonctionne pas bien sur mobile)
     if (e.key === 'Enter' && e.target.value.trim()) {
+      e.preventDefault()
       handleScanSuccess(e.target.value.trim())
       e.target.value = ''
     }
@@ -89,6 +91,11 @@ export default function QRScanner({ onScanSuccess, onScanError }) {
             <button
               onClick={stopScanning}
               className="btn-secondary"
+              style={{ 
+                touchAction: 'manipulation',
+                minWidth: '44px',
+                minHeight: '44px'
+              }}
             >
               Arrêter
             </button>
@@ -96,6 +103,11 @@ export default function QRScanner({ onScanSuccess, onScanError }) {
             <button
               onClick={startScanning}
               className="btn-primary flex items-center space-x-2"
+              style={{ 
+                touchAction: 'manipulation',
+                minWidth: '44px',
+                minHeight: '44px'
+              }}
             >
               <QrCode size={20} />
               <span>Démarrer le scan</span>
@@ -113,10 +125,16 @@ export default function QRScanner({ onScanSuccess, onScanError }) {
           </p>
           <input
             type="text"
-            onKeyPress={handleManualInput}
+            inputMode="text"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck="false"
+            onKeyDown={handleManualInput}
             placeholder="Entrez le code QR ou l'ID étudiant..."
             className="input"
             disabled={scanning}
+            style={{ fontSize: '16px' }} // Évite le zoom automatique sur iOS
           />
         </div>
       </Card>

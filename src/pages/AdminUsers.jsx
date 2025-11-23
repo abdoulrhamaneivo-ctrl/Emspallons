@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
-import { Plus, Edit, Trash2, Mail, User, Shield, KeyRound, Crown, Send, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, Edit, Trash2, Mail, User, Shield, KeyRound, Crown } from 'lucide-react'
 import AnimatedCard from '../components/ui/AnimatedCard'
 import AnimatedButton from '../components/ui/AnimatedButton'
 import AnimatedModal from '../components/ui/AnimatedModal'
@@ -48,34 +48,8 @@ export default function AdminUsers() {
 
       if (error) throw error
       
-      // Pour chaque utilisateur, vérifier le statut de confirmation email
-      // Note: On vérifie via l'API Supabase Auth directement
-      const usersWithStatus = await Promise.all(
-        (data || []).map(async (profile) => {
-          try {
-            // Utiliser la fonction Supabase Edge pour récupérer le statut
-            const { data: statusData, error: statusError } = await supabase.functions.invoke('get-user-email-status', {
-              body: { userId: profile.id }
-            })
-
-            if (statusError) {
-              // Si la fonction n'existe pas encore, on suppose que l'email n'est pas confirmé
-              return { ...profile, email_confirmed: false }
-            }
-
-            return {
-              ...profile,
-              email_confirmed: statusData?.email_confirmed ?? false,
-              email_confirmed_at: statusData?.email_confirmed_at ?? null
-            }
-          } catch (err) {
-            logger.debug('Erreur vérification statut email', err)
-            return { ...profile, email_confirmed: false }
-          }
-        })
-      )
-
-      setUsers(usersWithStatus)
+      // Les emails sont confirmés automatiquement, pas besoin de vérifier
+      setUsers(data || [])
     } catch (error) {
       logger.error('Erreur lors du chargement des utilisateurs', error)
       toast.error('Erreur lors du chargement des utilisateurs')
@@ -84,52 +58,7 @@ export default function AdminUsers() {
     }
   }
 
-  // Fonction pour renvoyer l'email de confirmation
-  const resendConfirmationEmail = async (userId, email) => {
-    try {
-      setLoading(true)
-      
-      // Utiliser la fonction Supabase Edge pour renvoyer l'email
-      const { data, error } = await supabase.functions.invoke('resend-confirmation-email', {
-        body: { userId, email }
-      })
-
-      if (error) {
-        if (error.message?.includes('Function not found') || error.message?.includes('404')) {
-          throw new Error(
-            'Edge Function resend-confirmation-email non déployée.\n\n' +
-            'Veuillez déployer les Edge Functions depuis le dossier supabase/functions.'
-          )
-        }
-        throw error
-      }
-
-      if (data?.error) throw new Error(data.error)
-
-      // Traçabilité
-      try {
-        await logActivity({
-          action: 'resend_confirmation_email',
-          entityType: 'user',
-          entityId: userId,
-          details: { email },
-        })
-      } catch (logError) {
-        logger.error('Erreur lors du logging d\'activité', logError)
-      }
-
-      toast.success('Email de confirmation renvoyé avec succès')
-      logger.info('Email de confirmation renvoyé', { userId, email })
-      
-      // Rafraîchir la liste des utilisateurs
-      await fetchUsers()
-    } catch (error) {
-      logger.error('Erreur lors de l\'envoi de l\'email de confirmation', error)
-      toast.error('Erreur lors de l\'envoi de l\'email : ' + (error.message || error.error || 'Erreur inconnue'))
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Les emails sont confirmés automatiquement, cette fonction n'est plus nécessaire
 
   const validate = () => {
     const newErrors = {}
@@ -274,23 +203,7 @@ export default function AdminUsers() {
         if (editingUser) {
           toast.success('Éducateur mis à jour avec succès')
         } else {
-          // Vérifier si l'email a été envoyé
-          if (result?.warning || result?.email_error) {
-            toast.error(
-              `Éducateur créé, mais l'email n'a pas pu être envoyé. ${result.warning || 'Configuration SMTP requise.'}`,
-              { duration: 6000 }
-            )
-            if (result.confirmation_link) {
-              console.log('🔗 Lien de confirmation:', result.confirmation_link)
-              logger.warn('Email non envoyé - Lien de confirmation disponible', {
-                userId: userCreated?.id,
-                email: formData.email.trim(),
-                confirmationLink: result.confirmation_link
-              })
-            }
-          } else {
-            toast.success('Éducateur créé avec succès. Un email de confirmation a été envoyé.')
-          }
+          toast.success('Éducateur créé avec succès.')
         }
       setShowForm(false)
       setEditingUser(null)
@@ -475,21 +388,6 @@ export default function AdminUsers() {
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            {user.email_confirmed === true ? (
-                              <span className="inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <CheckCircle size={14} />
-                                <span>Confirmé</span>
-                              </span>
-                            ) : user.email_confirmed === false ? (
-                              <span className="inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                <XCircle size={14} />
-                                <span>Non confirmé</span>
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-500">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
                               {getRoleLabel(user.role)}
                             </span>
@@ -519,16 +417,6 @@ export default function AdminUsers() {
                                     </button>
                                   )}
                                 </>
-                              )}
-                              {/* Bouton Renvoyer email de confirmation (si email non confirmé) */}
-                              {(user.email_confirmed === false || user.email_confirmed === null) && (
-                                <button
-                                  onClick={() => resendConfirmationEmail(user.id, user.email)}
-                                  className="px-3 py-1 text-sm bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition-colors"
-                                  title="Renvoyer l'email de confirmation"
-                                >
-                                  <Send size={16} />
-                                </button>
                               )}
                               {/* Bouton Promouvoir (visible seulement pour éducateurs) */}
                               {user.role === ROLES.EDUCATOR && isAdmin && (

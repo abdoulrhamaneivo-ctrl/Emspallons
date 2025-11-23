@@ -130,6 +130,9 @@ export default function Register() {
         throw new Error('Erreur lors de la création du compte')
       }
 
+      // Vérifier si l'email doit être confirmé
+      const emailNeedsConfirmation = authData.user.email_confirmed_at === null
+
       // Créer le profil dans la table profiles
       const { error: profileError } = await supabase
         .from('profiles')
@@ -148,6 +151,39 @@ export default function Register() {
         throw profileError
       }
 
+      // Si vérification d'email activée et email non confirmé
+      if (emailNeedsConfirmation) {
+        // Supabase envoie automatiquement l'email de confirmation lors de signUp()
+        // Pas besoin d'appel manuel, c'est géré automatiquement par Supabase
+        logger.info('Compte créé, email de confirmation envoyé automatiquement par Supabase', {
+          userId: authData.user.id,
+          email: formData.email.trim(),
+          emailSentAutomatically: true // Supabase envoie automatiquement
+        })
+        
+        toast.success(
+          'Compte créé avec succès ! Un email de confirmation a été envoyé automatiquement à votre adresse.',
+          { duration: 6000 }
+        )
+        
+        // Afficher un message informatif
+        toast.info(
+          'Vérifiez votre boîte mail (et les spams) pour confirmer votre compte.',
+          { duration: 8000 }
+        )
+        
+        // Rediriger vers login avec message
+        setTimeout(() => {
+          navigate('/login', {
+            state: { 
+              message: 'Un email de confirmation a été envoyé automatiquement. Vérifiez votre boîte mail (et les spams) pour confirmer votre compte avant de vous connecter.'
+            }
+          })
+        }, 3000)
+        return
+      }
+
+      // Si email déjà confirmé (vérification désactivée ou email confirmé)
       toast.success('Compte administrateur créé avec succès !')
       
       // Connexion automatique
@@ -157,7 +193,9 @@ export default function Register() {
       })
 
       if (signInError) {
-        logger.error('Erreur lors de l’auto-login', signInError)
+        logger.error('Erreur lors de l\'auto-login', signInError)
+        // Si la connexion échoue, rediriger vers login
+        toast.error('Compte créé mais connexion échouée. Veuillez vous connecter manuellement.')
         navigate('/login')
         return
       }

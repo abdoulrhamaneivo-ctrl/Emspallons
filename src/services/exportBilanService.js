@@ -58,8 +58,20 @@ export const getFutureSessions = (monthsLedger) => {
  */
 export const generateBilanMensuel = async (month, ligneId = null) => {
   try {
-    // Formater le mois (YYYY-MM)
-    const monthStr = format(parseISO(month), 'yyyy-MM')
+    // Normaliser le mois en 'yyyy-MM'
+    if (!month) {
+      throw new Error('Mois non sélectionné')
+    }
+    let monthStr = ''
+    if (/^\d{4}-\d{2}$/.test(month)) {
+      monthStr = month
+    } else {
+      try {
+        monthStr = format(parseISO(month), 'yyyy-MM')
+      } catch {
+        throw new Error('Format de mois invalide')
+      }
+    }
     
     // Récupérer les mois hors service depuis settings
     let pausedMonths = []

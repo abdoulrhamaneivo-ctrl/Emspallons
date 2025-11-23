@@ -169,7 +169,7 @@ export const generateReceiptPDF = async (payment, student) => {
 
     const pageWidth = doc.internal.pageSize.getWidth()
     const pageHeight = doc.internal.pageSize.getHeight()
-    const margin = 15
+    const margin = 20
     const contentWidth = pageWidth - (margin * 2)
   
     // Couleurs EMSP
@@ -220,103 +220,251 @@ export const generateReceiptPDF = async (payment, student) => {
     let yPosition = margin
   
     // ============================================
-    // HEADER SIMPLE
+    // HEADER PROFESSIONNEL AVEC BANDEAU
     // ============================================
     
-    // Titre simple
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.text('REÇU DE PAIEMENT', pageWidth / 2, yPosition, { align: 'center' })
+    // Bandeau coloré en haut
+    doc.setFillColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.rect(0, 0, pageWidth, 35, 'F')
     
-    yPosition += 10
+    // Titre principal dans le bandeau
+    doc.setFontSize(24)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.text('REÇU DE PAIEMENT', pageWidth / 2, 20, { align: 'center' })
+    
+    // Sous-titre
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(255, 255, 255)
+    doc.text('École Multinationale Supérieure des Postes', pageWidth / 2, 27, { align: 'center' })
+    
+    yPosition = 45
   
-    // Numéro de reçu simple
+    // Numéro de reçu et date dans un encadré
     const receiptNumber = generateReceiptNumber(payment.id)
     const emissionDate = formatDateFrench(new Date().toISOString())
     
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
-    doc.text(`N° ${receiptNumber}`, margin, yPosition)
-    doc.text(`Émis le ${emissionDate}`, pageWidth - margin, yPosition, { align: 'right' })
-  
-    yPosition += 12
-  
-    // ============================================
-    // INFORMATIONS ÉTUDIANT - SIMPLE
-    // ============================================
+    // Encadré pour le numéro de reçu
+    doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.setFillColor(glRgb.r, glRgb.g, glRgb.b)
+    doc.roundedRect(margin, yPosition - 8, contentWidth, 12, 2, 2, 'FD')
     
-    doc.setFontSize(10)
+    doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
-    doc.text('Étudiant :', margin, yPosition)
-    
-    yPosition += 7
+    doc.text(`N° ${receiptNumber}`, margin + 5, yPosition)
     
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
-    doc.text(`${student.nom} ${student.prenom || ''}`.trim(), margin, yPosition)
-    yPosition += 6
-    doc.text(`Classe : ${student.classe || 'N/A'}`, margin, yPosition)
-    yPosition += 6
-    doc.text(`Ligne : ${student.lines?.nom || 'N/A'}`, margin, yPosition)
-    
-    yPosition += 12
+    doc.text(`Émis le ${emissionDate}`, pageWidth - margin - 5, yPosition, { align: 'right' })
+  
+    yPosition += 20
   
     // ============================================
-    // DÉTAILS PAIEMENT - SIMPLE
+    // INFORMATIONS ÉTUDIANT - DESIGN AMÉLIORÉ
     // ============================================
     
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
-    doc.text(`Abonnement transport scolaire - ${payment.nombre_mois} mois`, margin, yPosition)
+    // Titre de section avec ligne décorative
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.text('INFORMATIONS ÉTUDIANT', margin, yPosition)
+    
+    // Ligne décorative sous le titre
+    hr(doc, yPosition + 3, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 2, margin, margin + 60)
     
     yPosition += 10
     
-    // Total
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
-    const totalAmount = formatCurrency(payment.montant_total).replace(' FCFA', ' F')
-    doc.text(`TOTAL : ${totalAmount}`, margin, yPosition)
-  
-    yPosition += 15
-  
-    // ============================================
-    // PÉRIODE COUVERTE - SIMPLE
-    // ============================================
+    // Encadré pour les informations étudiant
+    doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.setLineWidth(0.5)
+    doc.roundedRect(margin, yPosition - 8, contentWidth, 30, 3, 3, 'D')
     
-    doc.setFontSize(9)
+    let studentInfoY = yPosition
+    
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
+    doc.text(`Nom complet :`, margin + 5, studentInfoY)
+    
+    doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
+    doc.text(`${student.nom} ${student.prenom || ''}`.trim(), margin + 45, studentInfoY)
+    
+    studentInfoY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Classe :`, margin + 5, studentInfoY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`${student.classe || 'N/A'}`, margin + 45, studentInfoY)
+    
+    studentInfoY += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Ligne de transport :`, margin + 5, studentInfoY)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`${student.lines?.nom || 'N/A'}`, margin + 45, studentInfoY)
+    
+    if (student.contact) {
+      studentInfoY += 7
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Contact :`, margin + 5, studentInfoY)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${student.contact}`, margin + 45, studentInfoY)
+    }
+    
+    yPosition = studentInfoY + 15
+  
+    // ============================================
+    // DÉTAILS PAIEMENT - TABLEAU PROFESSIONNEL
+    // ============================================
+    
+    // Titre de section
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.text('DÉTAILS DU PAIEMENT', margin, yPosition)
+    
+    // Ligne décorative
+    hr(doc, yPosition + 3, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 2, margin, margin + 65)
+    
+    yPosition += 10
+    
+    // Tableau professionnel avec autoTable
+    const tableData = [
+      ['Description', 'Quantité', 'Prix unitaire', 'Montant'],
+      [
+        'Abonnement transport scolaire',
+        `${payment.nombre_mois} mois`,
+        formatCurrency(payment.montant_mensuel || (payment.nombre_mois ? (payment.montant_total / payment.nombre_mois) : payment.montant_total)),
+        formatCurrency(payment.montant_total)
+      ]
+    ]
+    
+    autoTable(doc, {
+      startY: yPosition,
+      head: [tableData[0]],
+      body: [tableData[1]],
+      theme: 'striped',
+      headStyles: {
+        fillColor: [gRgb.r, gRgb.g, gRgb.b],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10,
+        halign: 'center'
+      },
+      bodyStyles: {
+        textColor: [gdRgb.r, gdRgb.g, gdRgb.b],
+        fontSize: 10,
+        halign: 'center'
+      },
+      alternateRowStyles: {
+        fillColor: [glRgb.r, glRgb.g, glRgb.b]
+      },
+      styles: {
+        cellPadding: 5,
+        lineWidth: 0.5,
+        lineColor: [gRgb.r, gRgb.g, gRgb.b]
+      },
+      margin: { left: margin, right: margin },
+      tableWidth: contentWidth
+    })
+    
+    yPosition = doc.lastAutoTable.finalY + 10
+    
+    // Encadré pour le total avec accentuation
+    doc.setFillColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.roundedRect(margin, yPosition, contentWidth, 15, 3, 3, 'FD')
+    
+    const totalAmount = formatCurrency(payment.montant_total)
+    
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.text('TOTAL À PAYER', margin + contentWidth / 2 - 30, yPosition + 10, { align: 'left' })
+    doc.text(totalAmount, pageWidth - margin - 5, yPosition + 10, { align: 'right' })
+  
+    yPosition += 20
+  
+    // ============================================
+    // PÉRIODE COUVERTE - DESIGN AMÉLIORÉ
+    // ============================================
+    
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.text('PÉRIODE D\'ABONNEMENT', margin, yPosition)
+    
+    hr(doc, yPosition + 3, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 2, margin, margin + 70)
+    
+    yPosition += 10
+    
+    // Encadré pour la période
+    doc.setDrawColor(lgRgb.r, lgRgb.g, lgRgb.b)
+    doc.setFillColor(glRgb.r, glRgb.g, glRgb.b)
+    doc.roundedRect(margin, yPosition - 8, contentWidth, 12, 3, 3, 'FD')
     
     const startDate = formatDateFrench(payment.date_debut)
     const endDate = formatDateFrench(payment.date_fin)
     
-    doc.text(`Période : Du ${startDate} au ${endDate}`, margin, yPosition)
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
+    doc.text(`Du ${startDate} au ${endDate}`, margin + 5, yPosition)
+    
+    // Indication du nombre de mois
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(gRgb.r, gRgb.g, gRgb.b)
+    doc.text(`(${payment.nombre_mois} mois)`, pageWidth - margin - 5, yPosition, { align: 'right' })
   
     yPosition += 15
   
     // ============================================
-    // FOOTER - SIMPLE
+    // FOOTER PROFESSIONNEL AVEC COORDONNÉES
     // ============================================
     
-    // Ligne de séparation
-    hr(doc, yPosition, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 1, margin, pageWidth - margin)
+    // Ligne de séparation épaisse
+    hr(doc, yPosition, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 1.5, margin, pageWidth - margin)
     
     yPosition += 10
   
-    // Signature
+    // Zone signature
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(gdRgb.r, gdRgb.g, gdRgb.b)
-    doc.text('L\'Administration EMSP', pageWidth - margin, yPosition, { align: 'right' })
     
-    yPosition += 5
-    hr(doc, yPosition, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 0.5, pageWidth - margin - 50, pageWidth - margin)
+    // Signature à droite
+    doc.text('Pour l\'Administration EMSP,', pageWidth - margin, yPosition, { align: 'right' })
+    yPosition += 12
+    hr(doc, yPosition, { r: gRgb.r, g: gRgb.g, b: gRgb.b }, 0.5, pageWidth - margin - 60, pageWidth - margin)
+    yPosition += 7
+    doc.setFont('helvetica', 'bold')
+    doc.text('Signature et cachet', pageWidth - margin, yPosition, { align: 'right' })
+    
+    yPosition += 15
+    
+    // Coordonnées EMSP
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(gmRgb.r, gmRgb.g, gmRgb.b)
+    
+    doc.text('EMSP - École Multinationale Supérieure des Postes', margin, yPosition)
+    yPosition += 4
+    doc.text('Adresse : Abidjan, Côte d\'Ivoire', margin, yPosition)
+    yPosition += 4
+    doc.text('Email : contact@emsp.ci | Téléphone : +225 XX XX XX XX XX', margin, yPosition)
+    
+    yPosition += 10
+    
+    // Note légale
+    doc.setFontSize(7)
+    doc.setTextColor(gmRgb.r, gmRgb.g, gmRgb.b)
+    doc.text('Ce reçu est une pièce justificative officielle de paiement. À conserver précieusement.', margin, yPosition, { 
+      maxWidth: contentWidth,
+      align: 'justify'
+    })
 
     return doc
   } catch (error) {

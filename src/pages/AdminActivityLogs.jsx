@@ -140,6 +140,8 @@ export default function AdminActivityLogs() {
       'update_niveau': 'Modification niveau',
       'delete_niveau': 'Suppression niveau',
       'scan_qr_code': 'Scan QR code',
+      'reset_scans_hour': 'Réinitialisation compteur scans 1h',
+      'controller_login': 'Connexion contrôleur',
       'login': 'Connexion',
       'logout': 'Déconnexion',
       'import_students': 'Import étudiants',

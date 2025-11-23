@@ -125,11 +125,13 @@ export const ACTIONS = {
   
   // Scans
   SCAN_QR_CODE: 'scan_qr_code',
+  RESET_SCANS_HOUR: 'reset_scans_hour',
   
   // Authentification
   LOGIN: 'login',
   LOGOUT: 'logout',
   PASSWORD_CHANGE: 'password_change',
+  CONTROLLER_LOGIN: 'controller_login',
   
   // Import/Export
   IMPORT_STUDENTS: 'import_students',

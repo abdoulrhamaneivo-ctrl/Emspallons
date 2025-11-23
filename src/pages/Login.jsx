@@ -1,5 +1,5 @@
-import { useState, startTransition } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, startTransition, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import Layout from '../components/Layout'
@@ -19,6 +19,16 @@ export default function Login() {
   const [showFullForm, setShowFullForm] = useState(false)
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Afficher le message de location.state si présent
+  useEffect(() => {
+    if (location.state?.message) {
+      toast.info(location.state.message, { duration: 6000 })
+      // Nettoyer le state pour éviter de réafficher le message
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, location.pathname, navigate])
 
   const handleControllerAccess = async (e) => {
     e.preventDefault()

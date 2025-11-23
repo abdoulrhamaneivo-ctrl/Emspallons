@@ -54,11 +54,11 @@ serve(async (req) => {
       )
     }
 
-    // Créer l'utilisateur (email non confirmé, envoi d'email de confirmation)
+    // Créer l'utilisateur avec email confirmé automatiquement (pas de vérification email)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false, // ❌ Ne pas confirmer automatiquement, envoyer un email
+      email_confirm: true, // ✅ Confirmer automatiquement l'email (pas de vérification nécessaire)
       user_metadata: {
         nom,
       },
@@ -90,48 +90,7 @@ serve(async (req) => {
       throw profileError
     }
 
-    // Envoyer l'email de confirmation
-    // ⚠️ IMPORTANT : Supabase nécessite une configuration SMTP pour envoyer des emails
-    // Voir GUIDE_CONFIGURATION_EMAIL_SUPABASE.md pour la configuration
-    let emailSent = false
-    let emailError = null
-    let confirmationLink = null
-
-    try {
-      // Méthode 1 : Utiliser resend pour envoyer l'email de confirmation
-      const { data: resendData, error: resendError } = await supabaseAdmin.auth.admin.resend({
-        type: 'signup',
-        email,
-      })
-
-      if (resendError) {
-        console.warn('⚠️ Erreur resend (SMTP peut ne pas être configuré):', resendError.message)
-        emailError = resendError.message
-        
-        // Méthode 2 : Essayer avec generateLink pour obtenir le lien
-        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'signup',
-          email,
-        })
-        
-        if (linkError) {
-          console.warn('⚠️ Erreur generateLink:', linkError.message)
-          emailError = `Resend: ${resendError.message}, GenerateLink: ${linkError.message}`
-        } else {
-          confirmationLink = linkData.properties.action_link
-          console.log('✅ Lien de confirmation généré (email peut ne pas être envoyé automatiquement)')
-          console.log('🔗 Lien:', confirmationLink)
-        }
-      } else {
-        emailSent = true
-        console.log('✅ Email de confirmation envoyé avec succès à:', email)
-      }
-    } catch (emailErr) {
-      console.error('❌ Erreur lors de l\'envoi de l\'email de confirmation:', emailErr)
-      emailError = emailErr.message || 'Erreur inconnue'
-    }
-
-    // Préparer la réponse avec les informations d'email
+    // Préparer la réponse
     const responseData: any = {
       success: true,
       user: {
@@ -140,22 +99,7 @@ serve(async (req) => {
         nom,
         role,
       },
-    }
-
-    if (emailSent) {
-      responseData.message = 'Utilisateur créé. Un email de confirmation a été envoyé.'
-    } else {
-      responseData.message = 'Utilisateur créé, mais l\'email de confirmation n\'a pas pu être envoyé.'
-      responseData.warning = 'Configuration SMTP requise. Voir GUIDE_CONFIGURATION_EMAIL_SUPABASE.md'
-      if (emailError) {
-        responseData.email_error = emailError
-      }
-      if (confirmationLink) {
-        responseData.confirmation_link = confirmationLink
-        responseData.note = 'Vous pouvez utiliser ce lien pour confirmer manuellement l\'email de l\'utilisateur.'
-      } else {
-        responseData.note = 'Vous pouvez confirmer l\'email manuellement dans Supabase Dashboard (Auth → Users).'
-      }
+      message: 'Utilisateur créé avec succès. Email confirmé automatiquement.',
     }
 
     return new Response(

@@ -92,24 +92,72 @@ export default function Payments() {
     }
   }, [location.state])
 
-  const receiptCacheRef = useRef(new Map())
+  // Initialiser le cache avec useRef - utiliser une fonction pour éviter les erreurs TDZ
+  const receiptCacheRef = useRef(null)
+  
+  // Fonction helper pour obtenir le cache Map
+  const getCacheMap = useCallback(() => {
+    if (!receiptCacheRef.current) {
+      receiptCacheRef.current = new Map()
+    }
+    return receiptCacheRef.current
+  }, [])
 
   // Déplacer toutes les fonctions avant leur utilisation pour éviter les erreurs TDZ
   const getReceiptFromCache = useCallback(async (payment, student) => {
+    const cache = getCacheMap()
     const key = `${payment.id}-${student.id}`
-    if (receiptCacheRef.current.has(key)) {
-      return receiptCacheRef.current.get(key)
+    if (cache.has(key)) {
+      return cache.get(key)
     }
     const doc = await generateReceiptPDF(payment, student)
-    receiptCacheRef.current.set(key, doc)
+    cache.set(key, doc)
     return doc
-  }, [])
+  }, [getCacheMap])
 
   const handleDownloadReceipt = useCallback(async (payment) => {
     try {
-      const student = payment.students
+      // Récupérer l'étudiant depuis la relation students
+      let student = payment.students
+      
+      // Si students n'existe pas ou est null, essayer de récupérer l'étudiant via student_id
       if (!student) {
+        if (payment.student_id) {
+          try {
+            const { data: studentData, error: studentError } = await supabase
+              .from('students')
+              .select(`
+                id,
+                nom,
+                prenom,
+                classe,
+                niveau,
+                ligne_id,
+                lines:ligne_id (
+                  id,
+                  nom,
+                  couleur
+                )
+              `)
+              .eq('id', payment.student_id)
+              .single()
+
+            if (studentError) throw studentError
+            student = studentData
+          } catch (fetchError) {
+            logger.error('Erreur lors de la récupération de l\'étudiant', fetchError)
+            toast.error('Erreur lors de la récupération des données de l\'étudiant')
+            return
+          }
+        } else {
         toast.error('Données étudiant introuvables')
+          return
+        }
+      }
+
+      // Vérifier que student est valide
+      if (!student || !student.id) {
+        toast.error('Données étudiant invalides')
         return
       }
 
@@ -125,9 +173,47 @@ export default function Payments() {
 
   const handlePreviewReceipt = useCallback(async (payment) => {
     try {
-      const student = payment.students
+      // Récupérer l'étudiant depuis la relation students
+      let student = payment.students
+      
+      // Si students n'existe pas ou est null, essayer de récupérer l'étudiant via student_id
       if (!student) {
+        if (payment.student_id) {
+          try {
+            const { data: studentData, error: studentError } = await supabase
+              .from('students')
+              .select(`
+                id,
+                nom,
+                prenom,
+                classe,
+                niveau,
+                ligne_id,
+                lines:ligne_id (
+                  id,
+                  nom,
+                  couleur
+                )
+              `)
+              .eq('id', payment.student_id)
+              .single()
+
+            if (studentError) throw studentError
+            student = studentData
+          } catch (fetchError) {
+            logger.error('Erreur lors de la récupération de l\'étudiant', fetchError)
+            toast.error('Erreur lors de la récupération des données de l\'étudiant')
+            return
+          }
+        } else {
         toast.error('Données étudiant introuvables')
+          return
+        }
+      }
+
+      // Vérifier que student est valide
+      if (!student || !student.id) {
+        toast.error('Données étudiant invalides')
         return
       }
 

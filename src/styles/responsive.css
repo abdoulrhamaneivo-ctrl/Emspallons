@@ -434,6 +434,37 @@
     margin: 0.5rem !important;
     max-width: calc(100vw - 1rem) !important;
     max-height: calc(100vh - 1rem) !important;
+    width: auto !important;
+    overflow: hidden !important;
+  }
+
+  /* Header sticky pour garder le bouton Fermer visible */
+  .modal-header,
+  [class*="modal"] .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: inherit;
+  }
+
+  /* Corps scrollable pour éviter que le contenu masque le header */
+  .modal-body,
+  [class*="modal"] .modal-body,
+  [role="dialog"] .modal-body {
+    max-height: calc(90vh - 56px);
+    overflow: auto !important;
+  }
+
+  /* Contenus QR dans les modales: contraindre la taille */
+  [role="dialog"] img,
+  [role="dialog"] canvas,
+  [role="dialog"] svg,
+  [class*="modal"] img,
+  [class*="modal"] canvas,
+  [class*="modal"] svg {
+    display: block;
+    max-width: 100% !important;
+    height: auto !important;
   }
 
   /* Optimisation des toasts */

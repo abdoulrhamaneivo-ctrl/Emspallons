@@ -1,16 +1,18 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import Layout from '../components/Layout'
-import { Users, Settings, BarChart3, UserCheck, History, Route, DollarSign, AlertTriangle, Trash2, Calendar } from 'lucide-react'
+import { Users, Settings, BarChart3, UserCheck, History, Route, DollarSign, AlertTriangle, Trash2, Calendar, RefreshCw, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import AnimatedCard from '../components/ui/AnimatedCard'
 import PageTransition from '../components/ui/PageTransition'
 import { useAuth } from '../context/AuthContext'
 import ResetDatabaseModal from '../components/admin/ResetDatabaseModal'
+import ResetScansModal from '../components/admin/ResetScansModal'
 
 export default function Admin() {
   const { isAdmin, role } = useAuth()
   const [showResetModal, setShowResetModal] = useState(false)
+  const [showResetScansModal, setShowResetScansModal] = useState(false)
   
   const adminSections = [
     {
@@ -146,7 +148,26 @@ export default function Admin() {
                 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="font-semibold text-red-600 mb-2">
+                    <h3 className="font-semibold text-orange-600 mb-2 flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Réinitialiser le compteur d'heure des scans
+                    </h3>
+                    <p className="text-gray-600 mb-4">
+                      Supprime tous les scans de la dernière heure pour <strong>tous les étudiants et tous les contrôleurs</strong>.
+                      Cela permet de rescanner tous les étudiants immédiatement sans attendre la fin de l'heure.
+                    </p>
+                    <button
+                      onClick={() => setShowResetScansModal(true)}
+                      className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+                    >
+                      <RefreshCw className="w-5 h-5" />
+                      Réinitialiser le compteur d'heure
+                    </button>
+                  </div>
+                  
+                  <div className="border-t border-red-300 pt-4">
+                    <h3 className="font-semibold text-red-600 mb-2 flex items-center gap-2">
+                      <Trash2 className="w-5 h-5" />
                       Réinitialiser la base de données
                     </h3>
                     <p className="text-gray-600 mb-4">
@@ -168,7 +189,13 @@ export default function Admin() {
         </div>
       </PageTransition>
 
-      {/* Modal de réinitialisation */}
+      {/* Modal de réinitialisation scans */}
+      <ResetScansModal
+        isOpen={showResetScansModal}
+        onClose={() => setShowResetScansModal(false)}
+      />
+
+      {/* Modal de réinitialisation base de données */}
       <ResetDatabaseModal
         isOpen={showResetModal}
         onClose={() => setShowResetModal(false)}

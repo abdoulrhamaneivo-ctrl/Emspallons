@@ -6,13 +6,12 @@ import AnimatedButton from '../components/ui/AnimatedButton'
 import AnimatedModal from '../components/ui/AnimatedModal'
 import PageTransition from '../components/ui/PageTransition'
 import DeleteAccountModal from '../components/admin/DeleteAccountModal'
-import { User, Mail, Shield, Lock, Trash2, Edit, Send, CheckCircle, XCircle } from 'lucide-react'
+import { User, Mail, Shield, Lock, Trash2, Edit, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { ROLES } from '../lib/constants'
 import { Input } from '../components/ui'
 import logger from '../lib/logger'
-import { useEffect } from 'react'
 
 export default function Profile() {
   const { user, profile, isAdmin } = useAuth()
@@ -25,64 +24,7 @@ export default function Profile() {
   })
   const [changingPassword, setChangingPassword] = useState(false)
   const [errors, setErrors] = useState({})
-  const [emailConfirmed, setEmailConfirmed] = useState(null)
-  const [checkingEmailStatus, setCheckingEmailStatus] = useState(false)
-  const [resendingEmail, setResendingEmail] = useState(false)
-
-  // Vérifier le statut de confirmation email
-  useEffect(() => {
-    const checkEmailStatus = async () => {
-      if (!user?.id) return
-      
-      try {
-        setCheckingEmailStatus(true)
-        // Utiliser la fonction Supabase Edge pour vérifier le statut
-        const { data, error } = await supabase.functions.invoke('get-user-email-status', {
-          body: { userId: user.id }
-        })
-
-        if (!error && data) {
-          setEmailConfirmed(data.email_confirmed ?? false)
-        } else {
-          // Si la fonction n'existe pas, vérifier directement via la session
-          setEmailConfirmed(user.email_confirmed_at ? true : false)
-        }
-      } catch (err) {
-        logger.debug('Erreur vérification statut email', err)
-        setEmailConfirmed(user.email_confirmed_at ? true : false)
-      } finally {
-        setCheckingEmailStatus(false)
-      }
-    }
-
-    checkEmailStatus()
-  }, [user])
-
-  // Fonction pour renvoyer l'email de confirmation
-  const resendConfirmationEmail = async () => {
-    if (!user?.email) {
-      toast.error('Email non disponible')
-      return
-    }
-
-    try {
-      setResendingEmail(true)
-      
-      const { data, error } = await supabase.functions.invoke('resend-confirmation-email', {
-        body: { userId: user.id, email: user.email }
-      })
-
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
-
-      toast.success('Email de confirmation renvoyé avec succès. Vérifiez votre boîte mail.')
-    } catch (error) {
-      logger.error('Erreur lors de l\'envoi de l\'email de confirmation', error)
-      toast.error('Erreur lors de l\'envoi de l\'email : ' + (error.message || error.error || 'Erreur inconnue'))
-    } finally {
-      setResendingEmail(false)
-    }
-  }
+  // Les emails sont confirmés automatiquement, pas besoin de vérifier
 
   const getInitials = (name) => {
     if (!name) return '?'
@@ -214,30 +156,11 @@ export default function Profile() {
                         <p className="text-sm text-gray-500">Email</p>
                         <div className="flex items-center space-x-2">
                           <p className="font-medium text-gray-900">{user?.email || 'Non défini'}</p>
-                          {emailConfirmed === true ? (
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               <CheckCircle size={12} />
-                              <span>Confirmé</span>
+                            <span>Confirmé automatiquement</span>
                             </span>
-                          ) : emailConfirmed === false ? (
-                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                              <XCircle size={12} />
-                              <span>Non confirmé</span>
-                            </span>
-                          ) : checkingEmailStatus ? (
-                            <span className="text-xs text-gray-500">Vérification...</span>
-                          ) : null}
                         </div>
-                        {emailConfirmed === false && (
-                          <button
-                            onClick={resendConfirmationEmail}
-                            disabled={resendingEmail}
-                            className="mt-2 px-3 py-1.5 text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center space-x-1"
-                          >
-                            <Send size={12} />
-                            <span>{resendingEmail ? 'Envoi...' : 'Renvoyer l\'email de confirmation'}</span>
-                          </button>
-                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">

@@ -18,6 +18,7 @@ export default function AnimatedButton({
   ...props 
 }) {
   const [ripple, setRipple] = useState(null)
+  const [isClicking, setIsClicking] = useState(false)
 
   const handleClick = (e) => {
     if (disabled) {
@@ -25,6 +26,16 @@ export default function AnimatedButton({
       e.stopPropagation()
       return
     }
+
+    // Éviter les doubles clics
+    if (isClicking) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+
+    setIsClicking(true)
+    setTimeout(() => setIsClicking(false), 300)
 
     // Support touch et mouse events
     const button = e.currentTarget
@@ -37,20 +48,29 @@ export default function AnimatedButton({
     setTimeout(() => setRipple(null), 600)
 
     if (onClick) {
-      // Prévenir double clic sur mobile
-      e.preventDefault()
+      // Ne PAS prévenir le comportement par défaut pour permettre le clic natif
+      // Le navigateur gère mieux les événements natifs sur mobile
       onClick(e)
     }
   }
 
   const handleTouchStart = (e) => {
-    // Prévenir le comportement par défaut sur touch
+    // Ne pas prévenir sur touchStart pour permettre le comportement natif
     if (disabled) {
       e.preventDefault()
       e.stopPropagation()
       return
     }
-    // Note: on laisse onClick gérer le clic pour éviter double appel
+  }
+
+  const handleTouchEnd = (e) => {
+    // Ne pas prévenir sur touchEnd - laisser le navigateur gérer le clic
+    // Cela évite de bloquer les événements de clic sur mobile
+    if (disabled) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    // Note: onClick sera appelé automatiquement par le navigateur après touchEnd
   }
 
   return (
@@ -58,12 +78,7 @@ export default function AnimatedButton({
       type={type}
       onClick={handleClick}
       onTouchStart={handleTouchStart}
-      onTouchEnd={(e) => {
-        // Permettre le clic tactile sans double appel
-        if (!disabled && onClick && e.cancelable) {
-          e.preventDefault()
-        }
-      }}
+      onTouchEnd={handleTouchEnd}
       disabled={disabled}
       whileHover={!disabled ? { scale: 1.02 } : {}}
       whileTap={!disabled ? { scale: 0.98 } : {}}

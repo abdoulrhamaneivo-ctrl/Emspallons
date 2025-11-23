@@ -1,17 +1,59 @@
-import { useState, startTransition } from 'react'
+import { useState, startTransition, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { loginController } from '../../lib/controllerAuth'
+import { supabase } from '../../lib/supabase'
+import logger from '../../lib/logger'
 import { FloatingShapes, GradientOrb } from '../ui/DecorativeElements'
 import Logo from '../ui/Logo'
 import AnimatedButton from '../ui/AnimatedButton'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { User } from 'lucide-react'
+import ControllerProfile from './ControllerProfile'
 
 export default function ControllerLogin({ onLoginSuccess }) {
   const [code, setCode] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [selectedControllerCode, setSelectedControllerCode] = useState('')
+  const [recentControllers, setRecentControllers] = useState([])
   const navigate = useNavigate()
+
+  // Charger les contrôleurs actifs récents pour accès rapide
+  useEffect(() => {
+    const fetchRecentControllers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('controllers')
+          .select(`
+            id,
+            nom,
+            code,
+            active,
+            lines:ligne_id (
+              id,
+              nom,
+              couleur
+            )
+          `)
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (error) {
+          logger.debug('Error fetching recent controllers', error)
+          return
+        }
+
+        setRecentControllers(data || [])
+      } catch (error) {
+        logger.debug('Error fetching recent controllers', error)
+      }
+    }
+
+    fetchRecentControllers()
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -19,6 +61,31 @@ export default function ControllerLogin({ onLoginSuccess }) {
 
     try {
       const controllerData = await loginController(code, password)
+
+      // Logger la connexion dans activity_logs
+      try {
+        const { error: activityError } = await supabase.from('activity_logs').insert([
+          {
+            action: 'controller_login',
+            entity_type: 'controller',
+            entity_id: controllerData.id,
+            details: {
+              controller_name: controllerData.name,
+              controller_code: controllerData.code,
+              ligne_id: controllerData.line_id,
+              ligne_name: controllerData.line_name,
+            },
+          },
+        ])
+
+        if (activityError) {
+          logger.debug('Error logging controller login', activityError)
+          // Non bloquant
+        }
+      } catch (logError) {
+        logger.debug('Error logging controller login', logError)
+        // Non bloquant
+      }
 
       // Stocker la session immédiatement (non bloquant)
       sessionStorage.setItem('controller_session', JSON.stringify({
@@ -45,6 +112,43 @@ export default function ControllerLogin({ onLoginSuccess }) {
     } catch (error) {
       toast.error(error.message || 'Erreur de connexion')
       setLoading(false) // Réinitialiser seulement en cas d'erreur
+    }
+  }
+
+  const handleProfileClick = async (controllerCode) => {
+    // Vérifier que le contrôleur existe et est actif
+    try {
+      const { data: controller, error } = await supabase
+        .from('controllers')
+        .select('id, nom, code, active')
+        .eq('code', controllerCode)
+        .eq('active', true)
+        .maybeSingle()
+
+      if (error || !controller) {
+        toast.error('Code contrôleur invalide ou contrôleur inactif')
+        return
+      }
+
+      setSelectedControllerCode(controllerCode)
+      setShowProfileModal(true)
+    } catch (error) {
+      logger.error('Error checking controller', error)
+      toast.error('Erreur lors de la vérification du contrôleur')
+    }
+  }
+
+  const handleProfileLoginSuccess = (controllerData) => {
+    setShowProfileModal(false)
+    setCode('')
+    setPassword('')
+    
+    if (onLoginSuccess) {
+      onLoginSuccess(controllerData)
+    } else {
+      startTransition(() => {
+        navigate('/scan')
+      })
     }
   }
 
@@ -167,7 +271,61 @@ export default function ControllerLogin({ onLoginSuccess }) {
             </AnimatedButton>
           </motion.div>
         </form>
+
+        {/* Liste des contrôleurs récents pour accès rapide */}
+        {recentControllers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="mt-8 pt-8 border-t border-gray-200"
+          >
+            <p className="text-sm font-medium text-gray-700 mb-4 text-center">
+              Ou cliquez sur votre profil pour vous connecter
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {recentControllers.map((controller) => (
+                <motion.button
+                  key={controller.id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleProfileClick(controller.code)}
+                  className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-emsp-green/10 rounded-xl border-2 border-transparent hover:border-emsp-green/30 transition-all text-left group"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full bg-emsp-green/20 flex items-center justify-center text-emsp-green font-bold group-hover:bg-emsp-green/30 transition-colors"
+                    style={{
+                      backgroundColor: controller.lines?.couleur ? `${controller.lines.couleur}20` : undefined,
+                      color: controller.lines?.couleur || undefined,
+                    }}
+                  >
+                    <User size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {controller.nom}
+                    </p>
+                    <p className="text-xs text-gray-600 truncate font-mono">
+                      {controller.code}
+                    </p>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
       </motion.div>
+
+      {/* Modal de profil pour authentification */}
+      <ControllerProfile
+        isOpen={showProfileModal}
+        onClose={() => {
+          setShowProfileModal(false)
+          setSelectedControllerCode('')
+        }}
+        onLoginSuccess={handleProfileLoginSuccess}
+        controllerCode={selectedControllerCode}
+      />
     </div>
   )
 }
