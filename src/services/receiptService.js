@@ -4,6 +4,18 @@ import QRCode from 'qrcode'
 import { format } from 'date-fns'
 import { formatCurrency } from '../lib/utils'
 
+// Formatter sûr pour jsPDF: évite les espaces insécables et symboles non supportés
+const formatCurrencyPdf = (amount) => {
+  const a = (amount === null || amount === undefined) ? 0 : amount
+  const numeric = new Intl.NumberFormat('fr-FR', {
+    style: 'decimal',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(a)
+  // Remplacer NBSP (\u00A0) et NNBSP (\u202F) par espace normal
+  return `${numeric}`.replace(/[\u00A0\u202F]/g, ' ') + ' FCFA'
+}
+
 /**
  * Génère un numéro de reçu unique
  * Format: RCP-YYYY-MM-XXXX
@@ -337,8 +349,8 @@ export const generateReceiptPDF = async (payment, student) => {
       [
         'Abonnement transport scolaire',
         `${payment.nombre_mois} mois`,
-        formatCurrency(payment.montant_mensuel || (payment.nombre_mois ? (payment.montant_total / payment.nombre_mois) : payment.montant_total)),
-        formatCurrency(payment.montant_total)
+        formatCurrencyPdf(payment.montant_mensuel || (payment.nombre_mois ? (payment.montant_total / payment.nombre_mois) : payment.montant_total)),
+        formatCurrencyPdf(payment.montant_total)
       ]
     ]
     
@@ -378,7 +390,7 @@ export const generateReceiptPDF = async (payment, student) => {
     doc.setDrawColor(gRgb.r, gRgb.g, gRgb.b)
     doc.roundedRect(margin, yPosition, contentWidth, 15, 3, 3, 'FD')
     
-    const totalAmount = formatCurrency(payment.montant_total)
+    const totalAmount = formatCurrencyPdf(payment.montant_total)
     
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')

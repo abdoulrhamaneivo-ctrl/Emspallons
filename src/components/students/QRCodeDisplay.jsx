@@ -180,9 +180,9 @@ Présentez ce code au contrôleur lors de l'embarquement.
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full modal max-h-[90vh] overflow-hidden flex flex-col">
         {/* En-tête */}
-        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="modal-header border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 bg-white">
           <div>
             <h2 className="text-2xl font-bold text-emsp-green">QR Code</h2>
             <p className="text-sm text-gray-600 mt-1">
@@ -198,7 +198,7 @@ Présentez ce code au contrôleur lors de l'embarquement.
         </div>
 
         {/* Contenu */}
-        <div className="p-6 space-y-6">
+        <div className="modal-body p-6 space-y-6 overflow-auto">
           {/* QR Code - Taille augmentée pour meilleure lisibilité */}
           <div className="flex justify-center">
             <div
@@ -207,7 +207,7 @@ Présentez ce code au contrôleur lors de l'embarquement.
             >
               <QRCodeSVG
                 value={qrData}
-                size={320}
+                size={280}
                 level="H"
                 includeMargin={true}
                 fgColor="#2D5016"
