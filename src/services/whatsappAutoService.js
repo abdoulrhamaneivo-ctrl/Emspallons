@@ -8,7 +8,8 @@ import { formatCurrency, formatDate, formatMonthFrench } from '../lib/utils'
  */
 
 // Configuration API WhatsApp
-const WHATSAPP_API_URL = import.meta.env.VITE_WHATSAPP_API_URL || 'https://api.whatsapp.com/send'
+// URL par défaut pour WhatsApp Business Cloud API
+const WHATSAPP_API_URL = import.meta.env.VITE_WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0'
 const WHATSAPP_API_KEY = import.meta.env.VITE_WHATSAPP_API_KEY
 
 /**
@@ -136,11 +137,14 @@ async function sendWhatsAppMessageInternal(phone, message, attachmentUrl = null)
   if (WHATSAPP_API_KEY) {
     try {
       // Récupérer le Phone Number ID depuis les variables d'environnement
-      // Si non défini, utiliser le format standard de l'API
       const phoneNumberId = import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID
-      const apiUrl = phoneNumberId 
-        ? `${WHATSAPP_API_URL}/${phoneNumberId}/messages`
-        : `${WHATSAPP_API_URL}/messages`
+      
+      if (!phoneNumberId) {
+        throw new Error('VITE_WHATSAPP_PHONE_NUMBER_ID est requis pour utiliser l\'API WhatsApp Business')
+      }
+      
+      // Construire l'URL de l'API WhatsApp Business Cloud
+      const apiUrl = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`
 
       const response = await fetch(apiUrl, {
         method: 'POST',
