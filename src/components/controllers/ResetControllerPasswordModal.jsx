@@ -54,6 +54,18 @@ export default function ResetControllerPasswordModal({ isOpen, onClose, controll
 
       toast.success('Mot de passe modifié avec succès !')
       onSuccess()
+      // Ouvrir WhatsApp si un numéro est disponible
+      const phone = controller?.whatsapp
+      if (phone) {
+        const digits = phone.replace(/\D/g, '')
+        const message = `Contrôleur EMSP\n\nCode: ${controller?.code}\nNouveau mot de passe: ${password}\nLigne: ${controller?.lines?.nom || 'N/A'}\n\nAccès: ${window.location.origin}/scan`
+        const url = digits
+          ? `https://wa.me/${encodeURIComponent(digits)}?text=${encodeURIComponent(message)}`
+          : `https://wa.me/?text=${encodeURIComponent(message)}`
+        window.open(url, '_blank')
+      } else {
+        toast('Numéro WhatsApp non renseigné pour ce contrôleur', { icon: 'ℹ️' })
+      }
       onClose()
       setPassword('')
     } catch (error) {

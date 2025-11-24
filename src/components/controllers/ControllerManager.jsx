@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Plus, Edit, Trash2, RefreshCw, KeyRound } from 'lucide-react'
+import { Plus, Edit, Trash2, RefreshCw, KeyRound, MessageCircle } from 'lucide-react'
 import { Button, Badge, Card, Input, Select } from '../ui'
 import CreateControllerModal from './CreateControllerModal'
 import ResetControllerPasswordModal from './ResetControllerPasswordModal'
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../context/AuthContext'
 import { ROLES } from '../../lib/constants'
 import logger from '../../lib/logger'
+import { hashPassword, generateSecurePassword } from '../../lib/controllerAuth'
 
 export default function ControllerManager() {
   const { isAdmin, role, user } = useAuth()
@@ -24,6 +25,7 @@ export default function ControllerManager() {
     code: '',
     ligne_id: '',
     active: true,
+    whatsapp: '',
   })
   const [errors, setErrors] = useState({})
 
@@ -161,7 +163,7 @@ export default function ControllerManager() {
 
       setShowForm(false)
       setEditingController(null)
-      setFormData({ nom: '', code: '', ligne_id: '', active: true })
+      setFormData({ nom: '', code: '', ligne_id: '', active: true, whatsapp: '' })
       setErrors({})
       fetchControllers()
     } catch (error) {
@@ -213,6 +215,52 @@ export default function ControllerManager() {
     return controller.created_by === user?.id
   }
 
+  const openWhatsApp = (phone, message) => {
+    const digits = (phone || '').replace(/\D/g, '')
+    const url = digits
+      ? `https://wa.me/${encodeURIComponent(digits)}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank')
+  }
+
+  const handleSendWhatsApp = (controller) => {
+    const phone = controller.whatsapp
+    if (!phone) {
+      toast.error('Aucun numéro WhatsApp renseigné pour ce contrôleur')
+      return
+    }
+    const lineName = controller.lines?.nom || 'N/A'
+    const message = `Contrôleur EMSP\n\nCode: ${controller.code}\nLigne: ${lineName}\n\nAccès: ${window.location.origin}/scan\n\nSi vous avez perdu votre mot de passe, contactez l'admin pour le réinitialiser.`
+    openWhatsApp(phone, message)
+  }
+
+  const handleResetAndSend = async (controller) => {
+    try {
+      if (!canModifyPassword(controller)) {
+        toast.error("Vous n'avez pas la permission de réinitialiser ce mot de passe")
+        return
+      }
+      if (!controller.whatsapp) {
+        toast.error('Aucun numéro WhatsApp renseigné pour ce contrôleur')
+        return
+      }
+      const newPassword = generateSecurePassword(12)
+      const passwordHash = await hashPassword(newPassword)
+      const { error } = await supabase
+        .from('controllers')
+        .update({ password_hash: passwordHash })
+        .eq('id', controller.id)
+      if (error) throw error
+      toast.success('Mot de passe réinitialisé')
+      const lineName = controller.lines?.nom || 'N/A'
+      const message = `Contrôleur EMSP\n\nCode: ${controller.code}\nNouveau mot de passe: ${newPassword}\nLigne: ${lineName}\n\nAccès: ${window.location.origin}/scan`
+      openWhatsApp(controller.whatsapp, message)
+    } catch (error) {
+      toast.error(error.message || "Erreur lors de la réinitialisation et de l'envoi")
+      logger.error('Reset and send error', error)
+    }
+  }
+
   const handleEdit = (controller) => {
     setEditingController(controller)
     setFormData({
@@ -220,6 +268,7 @@ export default function ControllerManager() {
       code: controller.code || '',
       ligne_id: controller.ligne_id || '',
       active: controller.active ?? true,
+      whatsapp: controller.whatsapp || '',
     })
     setShowForm(true)
   }
@@ -326,6 +375,13 @@ export default function ControllerManager() {
                 ))}
               </Select>
 
+              <Input
+                label="Numéro WhatsApp"
+                value={formData.whatsapp}
+                onChange={(e) => setFormData((prev) => ({ ...prev, whatsapp: e.target.value }))}
+                placeholder="+225 07 XX XXX XXX"
+              />
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -421,6 +477,13 @@ export default function ControllerManager() {
                     <td className="py-3 px-4">
                       <div className="flex space-x-2">
                         <button
+                          onClick={() => handleSendWhatsApp(controller)}
+                          className="text-green-600 hover:text-green-700"
+                          title="Envoyer par WhatsApp"
+                        >
+                          <MessageCircle size={18} />
+                        </button>
+                        <button
                           onClick={() => handleEdit(controller)}
                           className="text-emsp-green hover:text-emsp-green-light"
                           title="Modifier"
@@ -446,6 +509,15 @@ export default function ControllerManager() {
                             title="Supprimer"
                           >
                             <Trash2 size={18} />
+                          </button>
+                        )}
+                        {canModifyPassword(controller) && (
+                          <button
+                            onClick={() => handleResetAndSend(controller)}
+                            className="text-emerald-600 hover:text-emerald-700"
+                            title="Réinitialiser et envoyer"
+                          >
+                            <RefreshCw size={18} />
                           </button>
                         )}
                       </div>
