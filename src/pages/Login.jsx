@@ -76,7 +76,7 @@ export default function Login() {
   return (
     <Layout>
       <PageTransition>
-        <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center relative">
+        <div className="min-h-[calc(100vh-8rem)] py-8 flex items-center justify-center relative overflow-y-auto">
           {/* Decorative elements */}
           <FloatingShapes />
           <GradientOrb position="top-right" size="large" />
@@ -86,7 +86,7 @@ export default function Login() {
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5, type: 'spring' }}
-            className="login-form bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl max-w-3xl w-full p-10 md:p-12 border-2 border-emsp-yellow/30 relative overflow-hidden z-10 card-enter"
+            className="login-form bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl max-w-3xl w-full p-10 md:p-12 border-2 border-emsp-yellow/30 relative overflow-visible z-10 card-enter my-8"
             style={{
               animation: 'slideInForm 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards'
             }}
