@@ -53,7 +53,7 @@ serve(async (req) => {
       )
     }
 
-    // Vérifier que l'utilisateur existe et n'est pas un admin
+    // Vérifier que l'utilisateur existe
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
@@ -64,13 +64,36 @@ serve(async (req) => {
       // Si le profil n'existe pas, on peut quand même essayer de supprimer l'utilisateur auth
       console.warn('Profile not found, attempting to delete auth user:', profileError)
     } else if (profile?.role === 'admin') {
-      return new Response(
-        JSON.stringify({ error: 'Impossible de supprimer un administrateur' }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
+      // Si c'est un admin, vérifier qu'il n'est pas le dernier admin
+      const { count, error: countError } = await supabaseAdmin
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'admin')
+
+      if (countError) {
+        console.error('Error counting admins:', countError)
+        return new Response(
+          JSON.stringify({ error: 'Erreur lors de la vérification des administrateurs' }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
+      // Si c'est le dernier admin, bloquer la suppression
+      if (count === 1) {
+        return new Response(
+          JSON.stringify({ error: 'Impossible de supprimer le dernier administrateur' }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        )
+      }
+
+      // Si ce n'est pas le dernier admin, permettre la suppression
+      console.log('Admin deletion allowed: not the last admin', { adminCount: count })
     }
 
     // Vérifier que l'utilisateur existe dans auth.users
