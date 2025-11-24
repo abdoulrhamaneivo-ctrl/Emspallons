@@ -143,20 +143,26 @@ Présentez ce code au contrôleur lors de l'embarquement.
 
       // Nettoyer le numéro de téléphone
       const cleanPhone = student.contact.replace(/\D/g, '')
+      
+      if (!cleanPhone) {
+        toast.error('Numéro de téléphone invalide')
+        return
+      }
+
       const encodedMessage = encodeURIComponent(message)
       
-      // Ouvrir WhatsApp avec le message
+      // Ouvrir WhatsApp automatiquement avec le numéro et le message
       const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
       window.open(whatsappUrl, '_blank')
       
-      toast.success('WhatsApp ouvert. Partagez le QR code manuellement depuis la page.')
+      toast.success('WhatsApp ouvert avec le numéro de l\'étudiant')
       
       // Essayer d'envoyer via l'API si disponible (en arrière-plan, non bloquant)
       sendQRCodeWhatsApp(student.id).catch(err => {
         logger.debug('Envoi WhatsApp API non disponible, utilisation manuelle', err)
       })
     } catch (error) {
-      logger.error('Erreur lors de l\'envoi par WhatsApp', error)
+      logger.error('Erreur lors de l\'ouverture de WhatsApp', error)
       toast.error('Erreur lors de l\'ouverture de WhatsApp')
     } finally {
       setLoading(false)

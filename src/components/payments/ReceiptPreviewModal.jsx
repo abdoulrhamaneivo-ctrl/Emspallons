@@ -72,16 +72,22 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
     }
   }
 
-  // Ouvrir WhatsApp pour envoyer le reçu
+  // Ouvrir WhatsApp automatiquement avec le numéro de l'étudiant
   const handleWhatsApp = () => {
     if (!payment || !student) return
+
+    if (!student.contact) {
+      toast.error('Contact de l\'étudiant non disponible')
+      return
+    }
 
     try {
       const whatsappUrl = generateWhatsAppLink(payment, student)
       window.open(whatsappUrl, '_blank')
+      toast.success('WhatsApp ouvert avec le numéro de l\'étudiant')
     } catch (error) {
       console.error('Erreur lors de l\'ouverture de WhatsApp:', error)
-      toast.error('Erreur lors de l\'ouverture de WhatsApp')
+      toast.error(error.message || 'Erreur lors de l\'ouverture de WhatsApp')
     }
   }
 

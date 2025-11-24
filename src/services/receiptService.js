@@ -499,15 +499,31 @@ export const downloadReceipt = (doc, studentName, paymentDate) => {
  * Génère un lien WhatsApp pour partager le reçu
  * @param {Object} payment - Données du paiement
  * @param {Object} student - Données de l'étudiant
- * @returns {string} - URL WhatsApp
+ * @returns {string} - URL WhatsApp avec le numéro de l'étudiant
  */
 export const generateWhatsAppLink = (payment, student) => {
-  const receiptNumber = generateReceiptNumber(payment.id)
-  const message = `Bonjour,\n\nReçu de paiement - ${student.nom} ${student.prenom || ''}\n\n` +
-    `N° Reçu: ${receiptNumber}\n` +
-    `Montant: ${formatCurrency(payment.montant_total)}\n` +
-    `Période: ${formatDateFrench(payment.date_debut)} - ${formatDateFrench(payment.date_fin)}\n\n` +
-    `Merci pour votre confiance.\n\nEMSP`
+  if (!student?.contact) {
+    throw new Error('Contact de l\'étudiant non disponible')
+  }
+
+  // Nettoyer le numéro de téléphone (retirer tous les caractères non numériques)
+  const cleanPhone = student.contact.replace(/\D/g, '')
   
-  return `https://wa.me/?text=${encodeURIComponent(message)}`
+  if (!cleanPhone) {
+    throw new Error('Numéro de téléphone invalide')
+  }
+
+  const receiptNumber = generateReceiptNumber(payment.id)
+  const message = `Bonjour ${student.prenom || ''} ${student.nom},\n\n` +
+    `✅ Votre paiement a été enregistré avec succès !\n\n` +
+    `📄 N° Reçu: ${receiptNumber}\n` +
+    `💰 Montant: ${formatCurrency(payment.montant_total)}\n` +
+    `📅 Période: ${formatDateFrench(payment.date_debut)} - ${formatDateFrench(payment.date_fin)}\n` +
+    `📆 Mois couverts: ${payment.nombre_mois} mois\n\n` +
+    `Votre reçu est disponible sur la plateforme.\n\n` +
+    `Merci de votre confiance.\n\n` +
+    `École EMSP`
+  
+  const encodedMessage = encodeURIComponent(message)
+  return `https://wa.me/${cleanPhone}?text=${encodedMessage}`
 }
