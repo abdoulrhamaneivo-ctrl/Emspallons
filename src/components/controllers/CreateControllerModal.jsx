@@ -22,6 +22,8 @@ export default function CreateControllerModal({ isOpen, onClose, onSuccess, line
     ligne_id: '',
     code: '',
     password: '',
+    whatsapp: '',
+    phoneCountry: 'CI',
   })
 
   const handleGenerateCode = () => {
@@ -49,6 +51,24 @@ export default function CreateControllerModal({ isOpen, onClose, onSuccess, line
     } else if (formData.password.length < 6) {
       newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères'
     }
+
+    // Validation WhatsApp (obligatoire)
+    try {
+      const { validatePhoneNumber, detectCountry, formatPhoneNumber } = require('../../lib/phoneFormatter')
+      const detected = detectCountry(formData.whatsapp)
+      const valid = validatePhoneNumber(formData.whatsapp, detected)
+      if (!formData.whatsapp.trim()) {
+        newErrors.whatsapp = 'Le numéro WhatsApp est requis'
+      } else if (!valid) {
+        newErrors.whatsapp = 'Numéro WhatsApp invalide (' + detected + ')'
+      } else {
+        // normaliser le numéro formaté
+        setFormData(prev => ({ ...prev, whatsapp: formatPhoneNumber(formData.whatsapp, detected), phoneCountry: detected }))
+      }
+    } catch (e) {
+      if (!formData.whatsapp.trim()) newErrors.whatsapp = 'Le numéro WhatsApp est requis'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -92,6 +112,7 @@ export default function CreateControllerModal({ isOpen, onClose, onSuccess, line
           password_hash: passwordHash,
           active: true,
           created_by: user?.id, // Enregistrer le créateur
+          whatsapp: formData.whatsapp.trim(), // optionnel si colonne existe
         }])
         .select(`
           *,
@@ -144,14 +165,18 @@ export default function CreateControllerModal({ isOpen, onClose, onSuccess, line
   const handleWhatsApp = () => {
     const line = lines.find(l => l.id === createdController.ligne_id)
     const message = `Contrôleur créé avec succès !\n\nCode: ${createdController.code}\nMot de passe: ${createdController.password}\nLigne: ${line?.nom || 'N/A'}\n\nAccès: ${window.location.origin}/scan`
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`
+    const phone = createdController.whatsapp || formData.whatsapp
+    const phoneParam = phone ? `${encodeURIComponent(phone.replace(/\s+/g, ''))}` : ''
+    const url = phoneParam
+      ? `https://wa.me/${phoneParam}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`
     window.open(url, '_blank')
   }
 
   const handleClose = () => {
     setShowSummary(false)
     setCreatedController(null)
-    setFormData({ nom: '', ligne_id: '', code: '', password: '' })
+    setFormData({ nom: '', ligne_id: '', code: '', password: '', whatsapp: '', phoneCountry: 'CI' })
     setErrors({})
     onClose()
   }
@@ -323,6 +348,21 @@ export default function CreateControllerModal({ isOpen, onClose, onSuccess, line
           </div>
           {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
           <p className="text-xs text-gray-500 mt-1">Recommandé : Utiliser la génération automatique</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Numéro WhatsApp du contrôleur *
+          </label>
+          <Input
+            value={formData.whatsapp}
+            onChange={(e) => setFormData(prev => ({ ...prev, whatsapp: e.target.value }))}
+            error={errors.whatsapp}
+            placeholder="+225 07 XX XXX XXX"
+            required
+          />
+          {errors.whatsapp && <p className="text-sm text-red-600 mt-1">{errors.whatsapp}</p>}
+          <p className="text-xs text-gray-500 mt-1">Format international recommandé. Exemple CI: +225 07 XX XXX XXX</p>
         </div>
 
         <div className="flex gap-3 pt-4">
