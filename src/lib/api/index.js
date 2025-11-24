@@ -3,14 +3,14 @@
  * Exporte tous les services et le client API
  */
 
-// Exporter apiClient en premier pour éviter les dépendances circulaires
-export { apiClient, default as ApiClient } from './apiClient'
-
-// Importer et exporter les services de manière lazy pour éviter les dépendances circulaires
+// Importer apiClient en premier
 import { apiClient } from './apiClient'
 import { supabase } from '../supabase'
 import { getUserProfileWithRole, invalidateProfileCache } from '../supabase'
 import logger from '../logger'
+
+// Exporter apiClient
+export { apiClient, default as ApiClient } from './apiClient'
 
 // AuthService
 class AuthService {
@@ -241,9 +241,19 @@ class DataService {
   }
 }
 
-// Instancier les services après avoir importé apiClient
-export const authService = new AuthService()
-export const dataService = new DataService()
+// S'assurer que apiClient est bien chargé avant d'instancier les services
+// En utilisant une fonction pour retarder l'instanciation
+function createAuthService() {
+  return new AuthService()
+}
+
+function createDataService() {
+  return new DataService()
+}
+
+// Instancier les services
+export const authService = createAuthService()
+export const dataService = createDataService()
 
 // Export par défaut
 export default {
