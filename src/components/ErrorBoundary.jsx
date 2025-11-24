@@ -1,20 +1,51 @@
 import React from 'react'
-import { AlertTriangle, Home, Mail, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Home, Mail, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { Button } from './ui'
 import { useNavigate } from 'react-router-dom'
+import logger from '../lib/logger'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null, errorInfo: null }
+    this.state = { 
+      hasError: false, 
+      error: null, 
+      errorInfo: null,
+      retryCount: 0,
+      isOnline: navigator.onLine
+    }
+    this.maxRetries = 3
   }
 
   static getDerivedStateFromError(error) {
     return { hasError: true }
   }
 
+  componentDidMount() {
+    // Écouter les changements de connexion
+    window.addEventListener('online', this.handleOnline)
+    window.addEventListener('offline', this.handleOffline)
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('online', this.handleOnline)
+    window.removeEventListener('offline', this.handleOffline)
+  }
+
+  handleOnline = () => {
+    this.setState({ isOnline: true })
+    // Réessayer automatiquement si on était hors ligne
+    if (this.state.hasError && this.state.retryCount < this.maxRetries) {
+      setTimeout(() => this.handleRetry(), 1000)
+    }
+  }
+
+  handleOffline = () => {
+    this.setState({ isOnline: false })
+  }
+
   componentDidCatch(error, errorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
+    logger.error('ErrorBoundary caught an error:', error, errorInfo)
     this.setState({
       error,
       errorInfo,
@@ -28,7 +59,28 @@ class ErrorBoundary extends React.Component {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null })
+    this.setState({ 
+      hasError: false, 
+      error: null, 
+      errorInfo: null,
+      retryCount: 0
+    })
+  }
+
+  handleRetry = () => {
+    const { retryCount } = this.state
+    
+    if (retryCount < this.maxRetries) {
+      this.setState({ 
+        retryCount: retryCount + 1,
+        hasError: false,
+        error: null,
+        errorInfo: null
+      })
+      
+      // Forcer un re-render en naviguant vers la page actuelle
+      window.location.reload()
+    }
   }
 
   handleReportError = () => {
@@ -57,19 +109,40 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const { isOnline, retryCount } = this.state
+      const canRetry = retryCount < this.maxRetries
+
       return (
         <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-green-50 to-emsp-green/5 flex items-center justify-center p-4">
           <div className="max-w-2xl w-full bg-white rounded-lg shadow-xl p-8 text-center">
             <div className="mb-6">
               <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle className="text-red-600" size={40} />
+                {isOnline ? (
+                  <AlertTriangle className="text-red-600" size={40} />
+                ) : (
+                  <WifiOff className="text-red-600" size={40} />
+                )}
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Oups ! Une erreur est survenue
+                {isOnline ? 'Oups ! Une erreur est survenue' : 'Connexion perdue'}
               </h1>
               <p className="text-gray-600">
-                Désolé, quelque chose s'est mal passé. Notre équipe a été notifiée.
+                {isOnline 
+                  ? 'Désolé, quelque chose s\'est mal passé. Notre équipe a été notifiée.'
+                  : 'Vérifiez votre connexion internet et réessayez.'}
               </p>
+              {!isOnline && (
+                <div className="mt-4 flex items-center justify-center gap-2 text-orange-600">
+                  <WifiOff size={20} />
+                  <span className="text-sm font-medium">Hors ligne</span>
+                </div>
+              )}
+              {isOnline && (
+                <div className="mt-4 flex items-center justify-center gap-2 text-green-600">
+                  <Wifi size={20} />
+                  <span className="text-sm font-medium">En ligne</span>
+                </div>
+              )}
             </div>
 
             {import.meta.env.DEV && this.state.error && (
@@ -87,6 +160,16 @@ class ErrorBoundary extends React.Component {
             )}
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {canRetry && isOnline && (
+                <Button
+                  variant="primary"
+                  onClick={this.handleRetry}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <RefreshCw size={20} />
+                  Réessayer {retryCount > 0 && `(${retryCount}/${this.maxRetries})`}
+                </Button>
+              )}
               <Button
                 variant="primary"
                 onClick={() => {
@@ -98,14 +181,17 @@ class ErrorBoundary extends React.Component {
                 <Home size={20} />
                 Retour à l'accueil
               </Button>
-              <Button
-                variant="outline"
-                onClick={this.handleReset}
-                className="flex items-center justify-center gap-2"
-              >
-                <RefreshCw size={20} />
-                Réessayer
-              </Button>
+              {!isOnline && (
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                  className="flex items-center justify-center gap-2"
+                  disabled={!isOnline}
+                >
+                  <RefreshCw size={20} />
+                  Actualiser la page
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 onClick={this.handleReportError}

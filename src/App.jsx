@@ -8,8 +8,10 @@ import { ROLES } from './lib/constants'
 import { AnimatePresence, motion } from 'framer-motion'
 import HelpPrompt from './components/ui/HelpPrompt'
 import { useUserPresence } from './hooks/useUserPresence'
+import { useNetworkStatus } from './hooks/useNetworkStatus'
 import { CardSkeleton, TableSkeleton } from './components/ui/LoadingSkeleton'
 import { SEO } from './components/SEO'
+import NetworkStatus from './components/ui/NetworkStatus'
 
 const lazyWithPreload = (loader) => {
   const Component = lazy(loader)
@@ -77,6 +79,9 @@ function AppRoutes() {
   
   // Activer le suivi de présence globalement
   useUserPresence()
+  
+  // Surveiller le statut réseau
+  useNetworkStatus()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -347,6 +352,7 @@ function AppRoutes() {
         <OnboardingTour />
       </Suspense>
       <HelpPrompt />
+      <NetworkStatus />
     </ErrorBoundary>
   )
 }

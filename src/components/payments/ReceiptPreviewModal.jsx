@@ -10,9 +10,11 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
   const [loading, setLoading] = useState(false)
   const lastGeneratedKey = useRef(null)
 
-  // Définir generatePDF AVANT useEffect pour éviter les erreurs TDZ
+  // Calculer la clé de cache pour le PDF
+  const cacheKey = payment?.id && student?.id ? `${payment.id}-${student.id}` : null
+
+  // Générer le PDF et le convertir en blob pour l'affichage
   const generatePDF = useCallback(async (keyOverride = null) => {
-    // Calculer cacheKey ici pour éviter dépendances circulaires
     const currentCacheKey = payment?.id && student?.id ? `${payment.id}-${student.id}` : null
     const cacheKeyToUse = keyOverride || currentCacheKey
     
@@ -21,8 +23,6 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
     setLoading(true)
     try {
       const doc = await generateReceiptPDF(payment, student)
-      
-      // Convertir le PDF en blob pour l'affichage
       const blob = doc.output('blob')
       const url = URL.createObjectURL(blob)
       
@@ -37,9 +37,7 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
     }
   }, [payment, student])
 
-  // Calculer cacheKey après generatePDF pour éviter erreurs TDZ
-  const cacheKey = payment?.id && student?.id ? `${payment.id}-${student.id}` : null
-
+  // Générer le PDF lorsque le modal s'ouvre ou que les données changent
   useEffect(() => {
     if (!isOpen || !cacheKey || !payment || !student) return
 
@@ -48,7 +46,7 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
       generatePDF(cacheKey)
     }
 
-    // Cleanup : révoquer l'URL blob lors du démontage
+    // Nettoyer l'URL blob lors du démontage pour éviter les fuites mémoire
     return () => {
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl)
@@ -57,13 +55,16 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, cacheKey, generatePDF])
 
+  // Télécharger le reçu en PDF
   const handleDownload = async () => {
     if (!payment || !student) return
 
     try {
       const doc = await generateReceiptPDF(payment, student)
       const studentName = `${student.nom} ${student.prenom || ''}`.trim()
-      downloadReceipt(doc, studentName, payment.created_at || new Date().toISOString())
+      const receiptDate = payment.created_at || new Date().toISOString()
+      
+      downloadReceipt(doc, studentName, receiptDate)
       toast.success('Reçu téléchargé')
     } catch (error) {
       console.error('Erreur lors du téléchargement:', error)
@@ -71,6 +72,7 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
     }
   }
 
+  // Ouvrir WhatsApp pour envoyer le reçu
   const handleWhatsApp = () => {
     if (!payment || !student) return
 
@@ -107,7 +109,7 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
         </div>
 
         {/* Contenu PDF */}
-        <div className="flex-1 overflow-hidden p-4">
+        <div className="flex-1 overflow-auto p-4">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
@@ -120,6 +122,8 @@ export default function ReceiptPreviewModal({ isOpen, onClose, payment, student 
               src={pdfUrl}
               className="w-full h-full border border-gray-300 rounded-lg"
               title="Aperçu du reçu"
+              style={{ minHeight: '600px' }}
+              allowFullScreen
             />
           ) : (
             <div className="flex items-center justify-center h-full">

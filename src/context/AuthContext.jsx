@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 /* eslint-disable react-refresh/only-export-components */
 import { supabase, getUserProfileWithRole } from '../lib/supabase'
+import { authService } from '../lib/api'
 import { ROLES } from '../lib/constants'
 import { addRecentProfile } from '../lib/recentProfiles'
 import logger from '../lib/logger'
@@ -15,11 +16,23 @@ export const useAuth = () => {
   return context
 }
 
+// Constantes pour la gestion de session
+const SESSION_CHECK_INTERVAL = 5 * 60 * 1000 // 5 minutes
+const SESSION_REFRESH_THRESHOLD = 5 * 60 * 1000 // Rafraîchir si expiration dans moins de 5 minutes
+const AUTH_LOADING_TIMEOUT = 3000 // 3 secondes
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  // Fonction helper pour réinitialiser l'état utilisateur
+  const resetUserState = () => {
+    setUser(null)
+    setRole(null)
+    setProfile(null)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -27,7 +40,7 @@ export const AuthProvider = ({ children }) => {
     let timeoutId = null
     let sessionLoaded = false
 
-    // Timeout de sécurité pour éviter le blocage (augmenté à 3 secondes pour laisser le temps au chargement)
+    // Timeout de sécurité pour éviter le blocage
     timeoutId = setTimeout(() => {
       if (mounted && !sessionLoaded) {
         logger.warn('Auth loading timeout - forcing loading to false', {
@@ -37,7 +50,7 @@ export const AuthProvider = ({ children }) => {
         })
         setLoading(false)
       }
-    }, 3000) // 3 secondes pour laisser le temps au chargement du rôle
+    }, AUTH_LOADING_TIMEOUT)
 
     // Fonction optimisée pour charger le profil utilisateur (une seule requête)
     const loadUserProfile = async (userId) => {
@@ -52,8 +65,8 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // Vérifier la session actuelle
-    supabase.auth.getSession()
+    // Vérifier la session actuelle avec retry automatique
+    authService.getSession()
       .then(async ({ data: { session }, error }) => {
         if (!mounted) return
         
@@ -113,9 +126,7 @@ export const AuthProvider = ({ children }) => {
     // Écouter les changements d'authentification (seulement après le chargement initial)
     try {
       let lastUserId = null // Pour éviter les chargements redondants
-      const {
-        data: { subscription: sub },
-      } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: { subscription: sub } } = authService.onAuthStateChange(async (event, session) => {
         if (!mounted) return
         
         // Ignorer le premier événement (déjà géré par getSession)
@@ -179,19 +190,101 @@ export const AuthProvider = ({ children }) => {
       .catch(() => {})
   }, [user?.id])
 
+  // Vérifier périodiquement si la session est toujours valide
+  useEffect(() => {
+    if (!user) return
+
+    const checkSessionValidity = async () => {
+      try {
+        const { data: { session }, error } = await authService.getSession()
+        
+        // Gérer les erreurs de session
+        if (error) {
+          logger.error('Error checking session validity', error)
+          try {
+            await authService.signOut()
+          } catch (signOutError) {
+            logger.error('Error during sign out', signOutError)
+          }
+          resetUserState()
+          return
+        }
+
+        // Vérifier si la session existe
+        if (!session || !session.user) {
+          logger.info('Session expired or invalid, signing out')
+          try {
+            await authService.signOut()
+          } catch (signOutError) {
+            logger.error('Error during sign out', signOutError)
+          }
+          resetUserState()
+          return
+        }
+
+        // Vérifier l'expiration du token (expires_at est en secondes)
+        if (session.expires_at) {
+          const expiresAt = session.expires_at * 1000 // Convertir en millisecondes
+          const now = Date.now()
+          const timeUntilExpiry = expiresAt - now
+
+          // Rafraîchir la session si elle expire bientôt
+          if (timeUntilExpiry < SESSION_REFRESH_THRESHOLD && timeUntilExpiry > 0) {
+            logger.debug('Session expiring soon, attempting refresh')
+            try {
+              const { data: refreshData, error: refreshError } = await authService.refreshSession()
+              
+              if (refreshError || !refreshData.session) {
+                logger.warn('Failed to refresh session', refreshError)
+                try {
+                  await authService.signOut()
+                } catch (signOutError) {
+                  logger.error('Error during sign out', signOutError)
+                }
+                resetUserState()
+              }
+            } catch (refreshError) {
+              logger.error('Error refreshing session', refreshError)
+              // Ne pas déconnecter en cas d'erreur réseau temporaire
+            }
+          } else if (timeUntilExpiry <= 0) {
+            // Session déjà expirée
+            logger.info('Session has expired, signing out')
+            try {
+              await authService.signOut()
+            } catch (signOutError) {
+              logger.error('Error during sign out', signOutError)
+            }
+            resetUserState()
+          }
+        }
+      } catch (error) {
+        logger.error('Error in session validity check', error)
+        // En cas d'erreur réseau, ne pas déconnecter immédiatement (peut être temporaire)
+      }
+    }
+
+    // Vérifier immédiatement au chargement
+    checkSessionValidity()
+
+    // Vérifier périodiquement
+    const intervalId = setInterval(checkSessionValidity, SESSION_CHECK_INTERVAL)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [user])
+
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { data, error } = await authService.signIn(email, password)
+    
     if (error) throw error
     
     // Mettre à jour l'utilisateur immédiatement
     if (data.user) {
       setUser(data.user)
       
-      // Charger le profil de manière PRIORITAIRE (sans attendre mais avec priorité)
-      // Utiliser getUserProfileWithRole pour une seule requête optimisée
+      // Charger le profil de manière asynchrone
       getUserProfileWithRole(data.user.id)
         .then(({ role: userRole, profile: userProfile }) => {
           setRole(userRole)
@@ -222,18 +315,15 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
-    
-    // Invalider le cache du profil lors de la déconnexion
-    if (user?.id) {
-      const { invalidateProfileCache } = await import('../lib/supabase')
-      invalidateProfileCache(user.id)
+    try {
+      await authService.signOut()
+      resetUserState()
+    } catch (error) {
+      logger.error('Error during sign out', error)
+      // Même en cas d'erreur, réinitialiser l'état local
+      resetUserState()
+      throw error
     }
-    
-    setUser(null)
-    setRole(null)
-    setProfile(null)
   }
 
   const value = {
